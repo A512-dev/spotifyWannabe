@@ -17,6 +17,7 @@ Shared code lives outside feature folders:
 - `components/ui` contains primitive reusable UI components.
 - `components/shared` contains product-level reusable components.
 - `components/layout` contains auth, main app, dashboard, sidebar, topbar, and player shell components.
+- `components/player` contains the Phase 1 player shell, placeholder controls, and track summary pieces.
 - `config` centralizes navigation, route access, and subscription feature rules.
 - `lib` contains helpers for permissions, subscriptions, labels, formatting, and class names.
 - `providers` contains simple mock contexts for auth/current user, app settings, and player UI state.
@@ -41,6 +42,7 @@ app/
   support/
 components/
   layout/
+  player/
   shared/
   ui/
 config/
@@ -67,4 +69,3 @@ npm install
 npm run type-check
 npm run dev
 ```
-

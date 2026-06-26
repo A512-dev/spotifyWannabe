@@ -15,8 +15,8 @@ const DEFAULT_PLAYER_STATE: PlayerState = {
 
 interface PlayerContextValue {
   playerState: PlayerState;
+  // Expose state replacement for future UI experiments, but do not add playback actions yet.
   setPlayerState: (state: PlayerState) => void;
-  togglePlayback: () => void;
 }
 
 const PlayerContext = createContext<PlayerContextValue | undefined>(undefined);
@@ -28,12 +28,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       playerState,
-      setPlayerState,
-      togglePlayback: () =>
-        setPlayerState((current) => ({
-          ...current,
-          isPlaying: !current.isPlaying
-        }))
+      setPlayerState
     }),
     [playerState]
   );
@@ -50,4 +45,3 @@ export function usePlayer() {
 
   return context;
 }
-
