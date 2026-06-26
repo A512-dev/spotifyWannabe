@@ -4,6 +4,7 @@ node_modules
 # Next.js build output
 .next
 out
+tsconfig.tsbuildinfo
 
 # Production build output
 dist
@@ -28,4 +29,3 @@ Thumbs.db
 .idea
 .vscode/*
 !.vscode/extensions.json
-
