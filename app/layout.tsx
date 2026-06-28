@@ -3,7 +3,7 @@ import { AppProviders } from "@/providers/AppProviders";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SoundWave",
+  title: "SpotifyWannaBe",
   description: "Phase 1 frontend foundation for a Spotify-like streaming app."
 };
 
