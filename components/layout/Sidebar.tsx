@@ -10,6 +10,10 @@ import { useAuth } from "@/providers/AuthProvider";
 export function Sidebar() {
   const pathname = usePathname();
   const { currentUser } = useAuth();
+  if (!currentUser) {
+    return null;
+  }
+
   const navigation = filterNavigationForUser(SIDEBAR_NAVIGATION, currentUser);
 
   return (
@@ -38,4 +42,3 @@ export function Sidebar() {
     </aside>
   );
 }
-

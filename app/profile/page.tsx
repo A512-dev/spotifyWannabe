@@ -1,11 +1,19 @@
+"use client";
+
 import { MainAppLayout } from "@/components/layout/MainAppLayout";
 import { PageHeader, StatCard } from "@/components/shared";
 import { Avatar, Button, Card } from "@/components/ui";
-import { currentUser } from "@/data/current-user";
 import { getRoleLabel, getSubscriptionLabel } from "@/lib/labels";
 import { canEditProfileImage } from "@/lib/subscription";
+import { useAuth } from "@/providers";
 
 export default function ProfilePage() {
+  const { currentUser } = useAuth();
+
+  if (!currentUser) {
+    return <MainAppLayout>Loading profile...</MainAppLayout>;
+  }
+
   return (
     <MainAppLayout>
       <PageHeader
@@ -26,10 +34,10 @@ export default function ProfilePage() {
           <StatCard label="Role" value={getRoleLabel(currentUser.role)} />
           <StatCard label="Subscription" value={getSubscriptionLabel(currentUser.subscriptionTier)} />
           <StatCard label="Email verified" value={currentUser.isEmailVerified ? "Yes" : "No"} />
+          <StatCard label="Username" value={currentUser.username ?? currentUser.id} />
           <StatCard label="Artist profile" value={currentUser.artistProfileId ?? "Not linked"} />
         </div>
       </section>
     </MainAppLayout>
   );
 }
-

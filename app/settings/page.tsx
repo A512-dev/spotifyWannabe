@@ -1,10 +1,18 @@
+"use client";
+
 import { MainAppLayout } from "@/components/layout/MainAppLayout";
 import { PageHeader } from "@/components/shared";
 import { Button, Card, Checkbox, Input, Select } from "@/components/ui";
-import { currentUser } from "@/data/current-user";
 import { canEditProfileImage } from "@/lib/subscription";
+import { useAuth } from "@/providers";
 
 export default function SettingsPage() {
+  const { currentUser } = useAuth();
+
+  if (!currentUser) {
+    return <MainAppLayout>Loading settings...</MainAppLayout>;
+  }
+
   return (
     <MainAppLayout>
       <PageHeader
@@ -42,4 +50,3 @@ export default function SettingsPage() {
     </MainAppLayout>
   );
 }
-

@@ -1,16 +1,27 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ACCOUNT_NAVIGATION } from "@/config/navigation";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { filterNavigationForUser } from "@/lib/permissions";
 import { getRoleLabel, getSubscriptionLabel } from "@/lib/labels";
 import { useAuth } from "@/providers/AuthProvider";
 
 export function Topbar() {
-  const { currentUser } = useAuth();
+  const router = useRouter();
+  const { currentUser, logout } = useAuth();
+  if (!currentUser) {
+    return null;
+  }
+
   const accountLinks = filterNavigationForUser(ACCOUNT_NAVIGATION, currentUser);
+  const handleLogout = () => {
+    logout();
+    router.push("/login");
+  };
 
   return (
     <header className="sticky top-0 z-20 border-b border-surface-700 bg-surface-900/95 px-4 py-3 backdrop-blur">
@@ -32,9 +43,11 @@ export function Topbar() {
             ))}
           </nav>
           <Avatar name={currentUser.displayName} src={currentUser.avatarUrl} />
+          <Button onClick={handleLogout} size="sm" variant="ghost">
+            Log out
+          </Button>
         </div>
       </div>
     </header>
   );
 }
-

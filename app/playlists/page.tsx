@@ -1,11 +1,19 @@
+"use client";
+
 import { MainAppLayout } from "@/components/layout/MainAppLayout";
 import { PageHeader, PlaylistCard, StatCard } from "@/components/shared";
 import { Button } from "@/components/ui";
-import { currentUser } from "@/data/current-user";
 import { playlists } from "@/data/playlists";
 import { getPlaylistLimit } from "@/lib/subscription";
+import { useAuth } from "@/providers";
 
 export default function PlaylistsPage() {
+  const { currentUser } = useAuth();
+
+  if (!currentUser) {
+    return <MainAppLayout>Loading playlists...</MainAppLayout>;
+  }
+
   const ownedPlaylists = playlists.filter((playlist) => playlist.ownerId === currentUser.id);
 
   return (
@@ -21,11 +29,10 @@ export default function PlaylistsPage() {
       </section>
       <section className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Developer 2 can add create/edit flows, collaborative playlists, and sorting here. */}
-        {playlists.map((playlist) => (
+        {ownedPlaylists.map((playlist) => (
           <PlaylistCard key={playlist.id} playlist={playlist} />
         ))}
       </section>
     </MainAppLayout>
   );
 }
-
