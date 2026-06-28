@@ -3,6 +3,8 @@
 
 export type UserRole = "listener" | "artist" | "support" | "admin";
 
+export type Gender = "female" | "male" | "other" | "prefer_not_to_say";
+
 export type SubscriptionTier = "basic" | "silver" | "gold";
 
 export type ISODateString = string;
@@ -26,6 +28,8 @@ export interface User {
   email: string;
   role: UserRole;
   subscriptionTier: SubscriptionTier;
+  birthDate?: ISODateString;
+  gender?: Gender;
   avatarUrl?: string;
   artistProfileId?: string;
   createdAt: ISODateString;
@@ -170,4 +174,3 @@ export interface PlayerState {
   repeatMode: "off" | "one" | "all";
   shuffleEnabled: boolean;
 }
-

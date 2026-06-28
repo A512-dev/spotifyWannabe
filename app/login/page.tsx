@@ -10,7 +10,7 @@ export default function LoginPage() {
     >
       <form className="space-y-4">
         {/* Add validation, auth API calls, and error display in the account feature area. */}
-        <Input label="Email" name="email" placeholder="maya.listener@example.com" type="email" />
+        <Input label="Email" name="email" placeholder="gheysar.listener@example.com" type="email" />
         <Input label="Password" name="password" placeholder="Enter your password" type="password" />
         <Button className="w-full" type="submit">
           Log in
@@ -27,4 +27,3 @@ export default function LoginPage() {
     </AuthLayout>
   );
 }
-
