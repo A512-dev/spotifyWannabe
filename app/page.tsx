@@ -1,28 +1,69 @@
+'use client';
+
+import Link from "next/link";
 import { MainAppLayout } from "@/components/layout/MainAppLayout";
-import { PageHeader, StatCard, TrackCard } from "@/components/shared";
+import { AlbumCard, PageHeader, TrackCard } from "@/components/shared";
+import { Button } from "@/components/ui";
+import { albums } from "@/data/albums";
+import { artists } from "@/data/artists";
+import { currentUser } from "@/data/current-user";
 import { tracks } from "@/data/tracks";
-import { formatNumber } from "@/lib/formatters";
 
 export default function HomePage() {
+  const getArtistName = (artistId: string) => {
+    return artists.find((a) => a.id === artistId)?.stageName || "Unknown Artist";
+  };
+
+  const recommendedTracks = tracks.slice(0, 4);
+  const featuredAlbums = albums.slice(0, 4);
+
   return (
     <MainAppLayout>
       <PageHeader
-        description="Shared landing skeleton for recommendations, recently played tracks, and subscription-aware prompts."
+        description="Discover new music, check your recent plays, and explore top recommendations."
         title="Home"
       />
 
-      {/* Developer 2 can replace these cards with recommendation modules later. */}
-      <section className="mt-6 grid gap-4 md:grid-cols-3">
-        <StatCard helperText="Mock catalog value" label="Tracks available" value={formatNumber(tracks.length)} />
-        <StatCard helperText="Placeholder metric" label="Daily mixes" value="6" />
-        <StatCard helperText="Subscription-aware later" label="Offline mode" value="Gold" />
+      {currentUser.subscriptionTier === "basic" && (
+        <div className="mt-6 flex items-center justify-between rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/20 to-orange-500/20 p-6">
+          <div>
+            <h3 className="text-lg font-bold text-amber-500">Upgrade to Premium</h3>
+            <p className="mt-1 text-sm text-amber-200">
+              Get unlimited playlists, offline mode, and high-quality audio.
+            </p>
+          </div>
+          <Button variant="primary">View Plans</Button>
+        </div>
+      )}
+
+      <section className="mt-8">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-xl font-bold text-slate-50">Recommended Tracks</h2>
+          <Link className="text-sm font-semibold text-slate-400 hover:text-slate-50" href="/music">
+            View All
+          </Link>
+        </div>
+        <div className="grid gap-3 lg:grid-cols-2">
+          {recommendedTracks.map((track) => (
+            <TrackCard 
+              artistName={getArtistName(track.artistId)} 
+              key={track.id} 
+              track={track} 
+            />
+          ))}
+        </div>
       </section>
 
       <section className="mt-8">
-        <h2 className="mb-3 text-lg font-semibold text-slate-50">Featured tracks</h2>
-        <div className="grid gap-3 lg:grid-cols-2">
-          {tracks.slice(0, 2).map((track) => (
-            <TrackCard artistName="Lina Torres" key={track.id} track={track} />
+        <h2 className="mb-4 text-xl font-bold text-slate-50">Featured Albums</h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {featuredAlbums.map((album) => (
+            <Link href={`/music/album/${album.id}`} key={album.id}>
+              <AlbumCard 
+                album={album} 
+                artistName={getArtistName(album.artistId)} 
+              />
+            </Link>
           ))}
         </div>
       </section>
