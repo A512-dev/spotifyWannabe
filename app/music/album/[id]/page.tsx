@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { MouseEvent } from "react";
+import { use, type MouseEvent } from "react";
 import { MainAppLayout } from "@/components/layout/MainAppLayout";
 import { EmptyState, TrackCard } from "@/components/shared";
 import { Button } from "@/components/ui";
@@ -12,15 +12,16 @@ import { tracks } from "@/data/tracks";
 import { usePlayer } from "@/providers";
 
 interface AlbumPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export default function AlbumPage({ params }: AlbumPageProps) {
+  const { id } = use(params);
   const router = useRouter();
   const { playerState, setPlayerState } = usePlayer();
-  const album = albums.find((item) => item.id === params.id);
+  const album = albums.find((item) => item.id === id);
   const albumTracks = tracks.filter((track) => album?.trackIds.includes(track.id));
   const artist = artists.find((item) => item.id === album?.artistId);
   const queueTrackIds = albumTracks.map((track) => track.id);

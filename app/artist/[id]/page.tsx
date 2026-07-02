@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { use } from "react";
 import { MainAppLayout } from "@/components/layout/MainAppLayout";
 import { AlbumCard, EmptyState, PageHeader, TrackCard } from "@/components/shared";
 import { Badge, Card } from "@/components/ui";
@@ -10,13 +11,14 @@ import { tracks } from "@/data/tracks";
 import { formatNumber } from "@/lib/formatters";
 
 interface ArtistProfilePageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export default function ArtistProfilePage({ params }: ArtistProfilePageProps) {
-  const artist = artists.find((item) => item.id === params.id);
+  const { id } = use(params);
+  const artist = artists.find((item) => item.id === id);
   const artistTracks = tracks.filter((track) => track.artistId === artist?.id);
   const artistAlbums = albums.filter((album) => album.artistId === artist?.id);
   const queueTrackIds = artistTracks.map((track) => track.id);
