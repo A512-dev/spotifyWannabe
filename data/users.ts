@@ -4,6 +4,7 @@ import type { User } from "@/types/domain";
 export const users: User[] = [
   {
     id: "user-listener-1",
+    username: "maya-stone-01",
     displayName: "Maya Stone",
     email: "maya.listener@example.com",
     role: "listener",
@@ -15,6 +16,7 @@ export const users: User[] = [
   },
   {
     id: "user-listener-2",
+    username: "noah-reed-02",
     displayName: "Noah Reed",
     email: "noah.basic@example.com",
     role: "listener",
@@ -26,6 +28,7 @@ export const users: User[] = [
   },
   {
     id: "user-artist-1",
+    username: "lina-torres-artist",
     displayName: "Lina Torres",
     email: "lina.artist@example.com",
     role: "artist",
@@ -38,6 +41,7 @@ export const users: User[] = [
   },
   {
     id: "user-support-1",
+    username: "samir-patel-support",
     displayName: "Samir Patel",
     email: "samir.support@example.com",
     role: "support",
@@ -49,6 +53,7 @@ export const users: User[] = [
   },
   {
     id: "user-admin-1",
+    username: "elena-park-admin",
     displayName: "Elena Park",
     email: "elena.admin@example.com",
     role: "admin",

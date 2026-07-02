@@ -34,6 +34,13 @@ interface ArtistApplicationInput {
   portfolioSamples: string;
 }
 
+interface UserProfileUpdateInput {
+  avatarUrl?: string;
+  birthDate?: string;
+  displayName?: string;
+  gender?: Gender;
+}
+
 export interface ArtistApplication {
   id: string;
   email: string;
@@ -53,6 +60,7 @@ interface AuthContextValue {
   requestPasswordReset: (email: string) => AuthActionResult<null>;
   setCurrentUser: (user: User | null) => void;
   submitArtistApplication: (input: ArtistApplicationInput) => AuthActionResult<ArtistApplication>;
+  updateCurrentUser: (input: UserProfileUpdateInput) => AuthActionResult<User>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -131,6 +139,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     setCurrentUser(null);
   }, [setCurrentUser]);
+
+  const updateCurrentUser = useCallback(
+    (input: UserProfileUpdateInput): AuthActionResult<User> => {
+      if (!currentUser) {
+        return {
+          ok: false,
+          error: "No user is currently signed in."
+        };
+      }
+
+      const nextUser: User = {
+        ...currentUser,
+        ...input,
+        lastActiveAt: new Date().toISOString()
+      };
+      const nextUsers = authUsers.map((user) => (user.id === nextUser.id ? nextUser : user));
+
+      setAuthUsers(nextUsers);
+      writeStoredValue(USERS_STORAGE_KEY, nextUsers);
+      setCurrentUser(nextUser);
+
+      return {
+        ok: true,
+        data: nextUser
+      };
+    },
+    [authUsers, currentUser, setCurrentUser]
+  );
 
   const registerListener = useCallback(
     (input: ListenerRegistrationInput): AuthActionResult<User> => {
@@ -230,7 +266,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       registerListener,
       requestPasswordReset,
       setCurrentUser,
-      submitArtistApplication
+      submitArtistApplication,
+      updateCurrentUser
     }),
     [
       artistApplications,
@@ -241,7 +278,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       registerListener,
       requestPasswordReset,
       setCurrentUser,
-      submitArtistApplication
+      submitArtistApplication,
+      updateCurrentUser
     ]
   );
 

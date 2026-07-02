@@ -6,6 +6,7 @@ export * from "@/data/current-user";
 export * from "@/data/financial-records";
 export * from "@/data/notifications";
 export * from "@/data/playlists";
+export * from "@/data/profile-stats";
 export * from "@/data/subscription-prices";
 export * from "@/data/tickets";
 export * from "@/data/tracks";
