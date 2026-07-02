@@ -1,6 +1,7 @@
 import type { RouteAccessRule, SubscriptionFeatureRule } from "@/types/navigation";
 
-// Route rules are simple for Phase 1. Later, middleware or server components can consume this config.
+// Phase 1 keeps route access rules centralized so layouts, future middleware,
+// and backend integration can reuse the same role contracts.
 export const ROUTE_ACCESS_RULES: RouteAccessRule[] = [
   {
     path: "/artist-dashboard",
@@ -20,28 +21,31 @@ export const ROUTE_ACCESS_RULES: RouteAccessRule[] = [
   }
 ];
 
-// Subscription rules keep product limits out of page components.
+// Playlist limits follow the project PDF:
+// Basic = 6 playlists, Silver = 100 playlists, Gold = unlimited.
+export const UNLIMITED_PLAYLIST_LIMIT = Number.POSITIVE_INFINITY;
+
+// Subscription rules keep product limits and premium permissions out of page components.
 export const SUBSCRIPTION_FEATURE_RULES: SubscriptionFeatureRule[] = [
   {
     tier: "basic",
-    playlistLimit: 5,
+    playlistLimit: 6,
     canEditProfileImage: false,
     canViewAdvancedStats: false,
     canUseOfflineMode: false
   },
   {
     tier: "silver",
-    playlistLimit: 25,
+    playlistLimit: 100,
     canEditProfileImage: true,
     canViewAdvancedStats: false,
     canUseOfflineMode: true
   },
   {
     tier: "gold",
-    playlistLimit: 100,
+    playlistLimit: UNLIMITED_PLAYLIST_LIMIT,
     canEditProfileImage: true,
     canViewAdvancedStats: true,
     canUseOfflineMode: true
   }
 ];
-

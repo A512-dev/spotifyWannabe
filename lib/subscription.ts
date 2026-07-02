@@ -9,8 +9,20 @@ export function getPlaylistLimit(tier: SubscriptionTier) {
   return getSubscriptionRule(tier)?.playlistLimit ?? 0;
 }
 
+export function hasUnlimitedPlaylistLimit(tier: SubscriptionTier) {
+  return !Number.isFinite(getPlaylistLimit(tier));
+}
+
+export function formatPlaylistLimit(tier: SubscriptionTier) {
+  const limit = getPlaylistLimit(tier);
+
+  return Number.isFinite(limit) ? String(limit) : "Unlimited";
+}
+
 export function canCreatePlaylist(user: User, currentPlaylistCount: number) {
-  return currentPlaylistCount < getPlaylistLimit(user.subscriptionTier);
+  const limit = getPlaylistLimit(user.subscriptionTier);
+
+  return currentPlaylistCount < limit;
 }
 
 export function canAccessAdvancedStats(user: User) {
@@ -21,3 +33,6 @@ export function canEditProfileImage(user: User) {
   return Boolean(getSubscriptionRule(user.subscriptionTier)?.canEditProfileImage);
 }
 
+export function canUseOfflineMode(user: User) {
+  return Boolean(getSubscriptionRule(user.subscriptionTier)?.canUseOfflineMode);
+}
