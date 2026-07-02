@@ -33,7 +33,7 @@ export function PlayerShell() {
         const trackIds = JSON.parse(queueJson) as string[];
         const queueTracks = trackIds.map(id => tracks.find(t => t.id === id)).filter((t): t is Track => Boolean(t));
         setActiveQueue(queueTracks.length > 0 ? queueTracks : tracks);
-      } catch (e) {
+      } catch {
         setActiveQueue(tracks);
       }
     } else {
