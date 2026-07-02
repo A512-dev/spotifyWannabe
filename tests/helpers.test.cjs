@@ -99,6 +99,14 @@ test("keeps Glass Hearts wired to an available public mp3 file", () => {
   assert.equal(fs.existsSync(audioPath), true);
 });
 
+test("keeps every mock track wired to an available public audio file", () => {
+  for (const track of tracks) {
+    const audioPath = path.join(process.cwd(), "public", track.audioUrl);
+
+    assert.equal(fs.existsSync(audioPath), true, `${track.id} has missing audio ${track.audioUrl}`);
+  }
+});
+
 test("keeps seeded playlist data aligned with app track IDs", () => {
   const userIds = new Set(users.map((user) => user.id));
   const playlistIds = new Set(playlists.map((playlist) => playlist.id));
