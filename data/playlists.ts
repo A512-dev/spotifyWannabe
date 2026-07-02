@@ -35,7 +35,7 @@ export const playlists: Playlist[] = [
     description: "Polished electronic tracks for deep work.",
     coverImageUrl: "/mock/playlists/focus-glow.png",
     isPublic: true,
-    itemIds: ["playlist-item-1", "playlist-item-2"],
+    itemIds: ["track-neon-rain", "track-starlit-static"],
     createdAt: "2026-04-15T12:00:00.000Z",
     updatedAt: "2026-05-01T10:32:00.000Z"
   },
@@ -46,7 +46,7 @@ export const playlists: Playlist[] = [
     description: "Easy songs for a quiet Saturday morning.",
     coverImageUrl: "/mock/playlists/weekend-soft-reset.png",
     isPublic: false,
-    itemIds: ["playlist-item-3"],
+    itemIds: ["track-glass-hearts"],
     createdAt: "2026-05-10T21:10:00.000Z",
     updatedAt: "2026-05-10T21:15:00.000Z"
   }

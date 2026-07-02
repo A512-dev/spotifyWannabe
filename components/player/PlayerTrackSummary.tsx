@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { albums } from "@/data/albums";
 import { artists } from "@/data/artists";
-import { currentUser } from "@/data/current-user";
 import { formatNumber } from "@/lib/formatters";
+import { useAuth } from "@/providers";
 import type { Track } from "@/types/domain";
 
 interface PlayerTrackSummaryProps {
@@ -12,6 +12,8 @@ interface PlayerTrackSummaryProps {
 }
 
 export function PlayerTrackSummary({ track }: PlayerTrackSummaryProps) {
+  const { currentUser } = useAuth();
+
   if (!track) {
     return null;
   }
@@ -19,7 +21,7 @@ export function PlayerTrackSummary({ track }: PlayerTrackSummaryProps) {
   const artist = artists.find((a) => a.id === track.artistId);
   const album = albums.find((a) => a.id === track.albumId);
   
-  const isGoldUser = currentUser.subscriptionTier === "gold";
+  const isGoldUser = currentUser?.subscriptionTier === "gold";
 
   return (
     <div className="flex w-full items-center gap-3">

@@ -1,15 +1,19 @@
 'use client';
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { MainAppLayout } from "@/components/layout/MainAppLayout";
 import { AlbumCard, PageHeader, TrackCard } from "@/components/shared";
 import { Button } from "@/components/ui";
 import { albums } from "@/data/albums";
 import { artists } from "@/data/artists";
-import { currentUser } from "@/data/current-user";
 import { tracks } from "@/data/tracks";
+import { useAuth } from "@/providers";
 
 export default function HomePage() {
+  const router = useRouter();
+  const { currentUser } = useAuth();
+
   const getArtistName = (artistId: string) => {
     return artists.find((a) => a.id === artistId)?.stageName || "Unknown Artist";
   };
@@ -24,7 +28,7 @@ export default function HomePage() {
         title="Home"
       />
 
-      {currentUser.subscriptionTier === "basic" && (
+      {currentUser?.subscriptionTier === "basic" && (
         <div className="mt-6 flex items-center justify-between rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/20 to-orange-500/20 p-6">
           <div>
             <h3 className="text-lg font-bold text-amber-500">Upgrade to Premium</h3>
@@ -32,7 +36,9 @@ export default function HomePage() {
               Get unlimited playlists, offline mode, and high-quality audio.
             </p>
           </div>
-          <Button variant="primary">View Plans</Button>
+          <Button onClick={() => router.push("/settings")} variant="primary">
+            View Plans
+          </Button>
         </div>
       )}
 

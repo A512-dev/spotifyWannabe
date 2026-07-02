@@ -4,6 +4,8 @@ const path = require("node:path");
 const test = require("node:test");
 
 const { mockCredentials } = require("@/data/auth-credentials");
+const { artists } = require("@/data/artists");
+const { playlistItems, playlists } = require("@/data/playlists");
 const { tracks } = require("@/data/tracks");
 const { users } = require("@/data/users");
 const { authenticateUser, getPostLoginPath, normalizeEmail } = require("@/lib/auth");
@@ -95,4 +97,34 @@ test("keeps Glass Hearts wired to an available public mp3 file", () => {
 
   assert.equal(track.audioUrl, "/mock/audio/glass-hearts.mp3");
   assert.equal(fs.existsSync(audioPath), true);
+});
+
+test("keeps seeded playlist data aligned with app track IDs", () => {
+  const userIds = new Set(users.map((user) => user.id));
+  const playlistIds = new Set(playlists.map((playlist) => playlist.id));
+  const trackIds = new Set(tracks.map((track) => track.id));
+  const artistIds = new Set(artists.map((artist) => artist.id));
+  const credentialEmails = new Set(mockCredentials.map((credential) => credential.email));
+
+  for (const user of users) {
+    assert.equal(credentialEmails.has(user.email), true, `${user.email} is missing login credentials`);
+  }
+
+  for (const track of tracks) {
+    assert.equal(artistIds.has(track.artistId), true, `${track.id} has an unknown artist`);
+  }
+
+  for (const playlist of playlists) {
+    assert.equal(userIds.has(playlist.ownerId), true, `${playlist.id} has an unknown owner`);
+
+    for (const trackId of playlist.itemIds) {
+      assert.equal(trackIds.has(trackId), true, `${playlist.id} includes unknown track ${trackId}`);
+    }
+  }
+
+  for (const item of playlistItems) {
+    assert.equal(playlistIds.has(item.playlistId), true, `${item.id} has an unknown playlist`);
+    assert.equal(trackIds.has(item.trackId), true, `${item.id} has an unknown track`);
+    assert.equal(userIds.has(item.addedByUserId), true, `${item.id} has an unknown adding user`);
+  }
 });

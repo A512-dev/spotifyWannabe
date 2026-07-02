@@ -1,12 +1,15 @@
 'use client';
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import type { MouseEvent } from "react";
 import { MainAppLayout } from "@/components/layout/MainAppLayout";
 import { EmptyState, TrackCard } from "@/components/shared";
 import { Button } from "@/components/ui";
 import { albums } from "@/data/albums";
 import { artists } from "@/data/artists";
 import { tracks } from "@/data/tracks";
+import { usePlayer } from "@/providers";
 
 interface AlbumPageProps {
   params: {
@@ -15,9 +18,35 @@ interface AlbumPageProps {
 }
 
 export default function AlbumPage({ params }: AlbumPageProps) {
+  const router = useRouter();
+  const { playerState, setPlayerState } = usePlayer();
   const album = albums.find((item) => item.id === params.id);
   const albumTracks = tracks.filter((track) => album?.trackIds.includes(track.id));
   const artist = artists.find((item) => item.id === album?.artistId);
+  const queueTrackIds = albumTracks.map((track) => track.id);
+
+  const playAlbumFrom = (trackId?: string) => {
+    if (!trackId || queueTrackIds.length === 0) {
+      return;
+    }
+
+    localStorage.setItem("soundwave_active_queue", JSON.stringify(queueTrackIds));
+    setPlayerState({
+      ...playerState,
+      currentTrackId: trackId,
+      queueTrackIds,
+      isPlaying: true
+    });
+  };
+
+  const handleShuffle = (event: MouseEvent<HTMLButtonElement>) => {
+    if (queueTrackIds.length === 0) {
+      return;
+    }
+
+    const randomTrackId = queueTrackIds[Math.floor(event.timeStamp) % queueTrackIds.length];
+    playAlbumFrom(randomTrackId);
+  };
 
   return (
     <MainAppLayout>
@@ -63,10 +92,20 @@ export default function AlbumPage({ params }: AlbumPageProps) {
           </div>
 
           <div className="mb-8 flex items-center gap-4">
-            <Button size="lg" variant="primary" className="rounded-full px-8 py-3 text-base font-bold">
+            <Button
+              className="rounded-full px-8 py-3 text-base font-bold"
+              onClick={() => playAlbumFrom(queueTrackIds[0])}
+              size="lg"
+              variant="primary"
+            >
               Play
             </Button>
-            <Button size="lg" variant="secondary" className="rounded-full px-8 py-3 text-base font-bold">
+            <Button
+              className="rounded-full px-8 py-3 text-base font-bold"
+              onClick={handleShuffle}
+              size="lg"
+              variant="secondary"
+            >
               Shuffle
             </Button>
           </div>
@@ -83,7 +122,7 @@ export default function AlbumPage({ params }: AlbumPageProps) {
                   {index + 1}
                 </div>
                 <div className="flex-1">
-                  <TrackCard artistName={artist?.stageName} track={track} />
+                  <TrackCard artistName={artist?.stageName} contextQueue={queueTrackIds} track={track} />
                 </div>
               </div>
             ))}
@@ -91,6 +130,11 @@ export default function AlbumPage({ params }: AlbumPageProps) {
         </>
       ) : (
         <EmptyState 
+          action={
+            <Button onClick={() => router.push("/music")} variant="secondary">
+              Back to music
+            </Button>
+          }
           description="The requested album does not exist in the mock catalog." 
           title="Album not found" 
         />

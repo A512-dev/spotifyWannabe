@@ -6,14 +6,15 @@ import { PlayerControlsPlaceholder } from "@/components/player/PlayerControlsPla
 import { PlayerTrackSummary } from "@/components/player/PlayerTrackSummary";
 import { albums } from "@/data/albums";
 import { artists } from "@/data/artists";
-import { currentUser } from "@/data/current-user";
 import { tracks } from "@/data/tracks";
+import { useAuth } from "@/providers";
 import { usePlayer } from "@/providers/PlayerProvider";
 import { formatNumber } from "@/lib/formatters";
 import type { Track } from "@/types/domain";
 
 export function PlayerShell() {
   const { playerState, setPlayerState } = usePlayer();
+  const { currentUser } = useAuth();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const currentTrack = tracks.find((track) => track.id === playerState.currentTrackId);
   const currentArtist = currentTrack ? artists.find((a) => a.id === currentTrack.artistId) : null;
@@ -164,7 +165,7 @@ export function PlayerShell() {
 
   const currentIdx = activeQueue.findIndex(t => t.id === currentTrack.id);
   const upcomingTracks = activeQueue.slice(currentIdx + 1, currentIdx + 6); 
-  const isGoldUser = currentUser.subscriptionTier === "gold";
+  const isGoldUser = currentUser?.subscriptionTier === "gold";
 
   return (
     <>
@@ -213,7 +214,12 @@ export function PlayerShell() {
                 <path d="M15 15H1v-1.5h14V15zm0-4.5H1V9h14v1.5zm-14-7A2.5 2.5 0 0 1 3.5 1h9a2.5 2.5 0 0 1 0 5h-9A2.5 2.5 0 0 1 1 3.5zm2.5-1a1 1 0 0 0 0 2h9a1 1 0 1 0 0-2h-9z" />
               </svg>
             </button>
-            <button className="text-slate-400 transition-colors hover:text-slate-50">
+            <button
+              className="text-slate-400 transition-colors hover:text-slate-50"
+              onClick={() => handleVolumeChange(volume === 0 ? 80 : 0)}
+              title={volume === 0 ? "Unmute" : "Mute"}
+              type="button"
+            >
               <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 16 16">
                 <path d="M9.741.85a.75.75 0 0 1 .375.65v13a.75.75 0 0 1-1.125.65l-6.925-4a3.642 3.642 0 0 1-1.33-4.967 3.639 3.639 0 0 1 1.33-1.332l6.925-4a.75.75 0 0 1 .75 0zm-6.924 5.3a2.139 2.139 0 0 0-1.042 1.85 2.14 2.14 0 0 0 1.042 1.851l6.425 3.71V1.85l-6.425 3.71z" />
                 <path d="M13.5 3.25a.75.75 0 0 0-1.5 0v9.5a.75.75 0 0 0 1.5 0v-9.5z" />
