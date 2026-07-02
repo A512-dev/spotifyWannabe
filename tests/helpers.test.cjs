@@ -1,7 +1,10 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const test = require("node:test");
 
 const { mockCredentials } = require("@/data/auth-credentials");
+const { tracks } = require("@/data/tracks");
 const { users } = require("@/data/users");
 const { authenticateUser, getPostLoginPath, normalizeEmail } = require("@/lib/auth");
 const { formatCurrencyFromCents, formatDuration, formatNumber } = require("@/lib/formatters");
@@ -84,4 +87,12 @@ test("maps subscription feature permissions", () => {
   assert.equal(canEditProfileImage(basicListener), false);
   assert.equal(canUseOfflineMode(artist), true);
   assert.equal(canAccessAdvancedStats(listener), true);
+});
+
+test("keeps Glass Hearts wired to an available public mp3 file", () => {
+  const track = tracks.find((item) => item.id === "track-glass-hearts");
+  const audioPath = path.join(process.cwd(), "public", track.audioUrl);
+
+  assert.equal(track.audioUrl, "/mock/audio/glass-hearts.mp3");
+  assert.equal(fs.existsSync(audioPath), true);
 });

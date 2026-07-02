@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { PlayerControlsPlaceholder } from "@/components/player/PlayerControlsPlaceholder";
 import { PlayerTrackSummary } from "@/components/player/PlayerTrackSummary";
@@ -14,6 +14,7 @@ import type { Track } from "@/types/domain";
 
 export function PlayerShell() {
   const { playerState, setPlayerState } = usePlayer();
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const currentTrack = tracks.find((track) => track.id === playerState.currentTrackId);
   const currentArtist = currentTrack ? artists.find((a) => a.id === currentTrack.artistId) : null;
   const currentAlbum = currentTrack ? albums.find((a) => a.id === currentTrack.albumId) : null;
@@ -24,6 +25,7 @@ export function PlayerShell() {
   const [progress, setProgress] = useState(0);
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState<"off" | "all" | "one">("off");
+  const volume = playerState.volume ?? 100;
 
   useEffect(() => {
     setProgress(0);
@@ -89,24 +91,38 @@ export function PlayerShell() {
   }, [currentTrack, progress, repeat, playerState, setPlayerState, activeQueue]);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (playerState.isPlaying && currentTrack) {
-      interval = setInterval(() => {
-        setProgress((prev) => {
-          if (prev >= currentTrack.durationSeconds) {
-            if (repeat === "one") {
-              return 0; 
-            } else {
-              handleNext();
-              return prev;
-            }
-          }
-          return prev + 1;
-        });
-      }, 1000);
+    const audio = audioRef.current;
+
+    if (!audio || !currentTrack) {
+      return;
     }
-    return () => clearInterval(interval);
-  }, [playerState.isPlaying, currentTrack, repeat, handleNext]);
+
+    audio.load();
+    setProgress(0);
+  }, [currentTrack]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+
+    if (!audio) {
+      return;
+    }
+
+    if (playerState.isPlaying) {
+      void audio.play().catch(() => {
+        setPlayerState({ ...playerState, isPlaying: false });
+      });
+      return;
+    }
+
+    audio.pause();
+  }, [playerState, setPlayerState]);
+
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = Math.min(Math.max(volume / 100, 0), 1);
+    }
+  }, [volume]);
 
   if (!currentTrack) return null;
 
@@ -122,19 +138,42 @@ export function PlayerShell() {
     }
   };
 
+  const handleSeek = (time: number) => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = time;
+    }
+
+    setProgress(time);
+  };
+
+  const handleAudioEnded = () => {
+    if (repeat === "one" && audioRef.current) {
+      audioRef.current.currentTime = 0;
+      void audioRef.current.play();
+      return;
+    }
+
+    handleNext();
+  };
+
   const toggleRepeat = () => {
     if (repeat === "off") setRepeat("all");
     else if (repeat === "all") setRepeat("one");
     else setRepeat("off");
   };
 
-  const volume = playerState.volume ?? 100;
   const currentIdx = activeQueue.findIndex(t => t.id === currentTrack.id);
   const upcomingTracks = activeQueue.slice(currentIdx + 1, currentIdx + 6); 
   const isGoldUser = currentUser.subscriptionTier === "gold";
 
   return (
     <>
+      <audio
+        onEnded={handleAudioEnded}
+        onTimeUpdate={(event) => setProgress(Math.floor(event.currentTarget.currentTime))}
+        ref={audioRef}
+        src={currentTrack.audioUrl}
+      />
       <footer className="fixed bottom-0 left-0 right-0 z-40 border-t border-surface-700 bg-surface-900 px-2 py-2 shadow-player sm:px-4 sm:py-3">
         {/* تقارن ابعاد: سمت چپ 30٪، مرکز Flex-1، سمت راست 30٪ */}
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 relative">
@@ -156,7 +195,7 @@ export function PlayerShell() {
               onPlayPause={togglePlayPause}
               onPrevious={handlePrevious}
               onRepeatToggle={toggleRepeat}
-              onSeek={setProgress}
+              onSeek={handleSeek}
               onShuffleToggle={() => setShuffle(!shuffle)}
               progress={progress}
               repeat={repeat}
@@ -201,7 +240,7 @@ export function PlayerShell() {
               onPlayPause={togglePlayPause}
               onPrevious={handlePrevious}
               onRepeatToggle={toggleRepeat}
-              onSeek={setProgress}
+              onSeek={handleSeek}
               onShuffleToggle={() => setShuffle(!shuffle)}
               progress={progress}
               repeat={repeat}
@@ -308,7 +347,7 @@ export function PlayerShell() {
                 onPlayPause={togglePlayPause}
                 onPrevious={handlePrevious}
                 onRepeatToggle={toggleRepeat}
-                onSeek={setProgress}
+                onSeek={handleSeek}
                 onShuffleToggle={() => setShuffle(!shuffle)}
                 progress={progress}
                 repeat={repeat}
