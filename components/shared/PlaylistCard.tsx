@@ -9,7 +9,15 @@ interface PlaylistCardProps {
 export function PlaylistCard({ playlist }: PlaylistCardProps) {
   return (
     <Card>
-      <div className="aspect-square rounded-md bg-surface-700" />
+      {playlist.coverImageUrl ? (
+        <img
+          alt={`${playlist.title} cover`}
+          className="aspect-square w-full rounded-md object-cover"
+          src={playlist.coverImageUrl}
+        />
+      ) : (
+        <div className="aspect-square rounded-md bg-surface-700" />
+      )}
       <div className="mt-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate font-medium text-slate-50">{playlist.title}</p>
@@ -22,4 +30,3 @@ export function PlaylistCard({ playlist }: PlaylistCardProps) {
     </Card>
   );
 }
-

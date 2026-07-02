@@ -11,8 +11,8 @@ export const artists: ArtistProfile[] = [
     followerCount: 32200,
     approvalStatus: "approved",
     verifiedAt: "2025-02-18T12:00:00.000Z",
-    profileImageUrl: "/mock/artists/lina-profile.jpg",
-    bannerImageUrl: "/mock/artists/lina-banner.jpg"
+    profileImageUrl: "/mock/artists/lina-profile.png",
+    bannerImageUrl: "/mock/artists/lina-banner.png"
   },
   {
     id: "artist-orbit",
@@ -23,7 +23,6 @@ export const artists: ArtistProfile[] = [
     monthlyListeners: 2400,
     followerCount: 860,
     approvalStatus: "pending",
-    profileImageUrl: "/mock/artists/orbit-profile.jpg"
+    profileImageUrl: "/mock/artists/orbit-profile.png"
   }
 ];
-

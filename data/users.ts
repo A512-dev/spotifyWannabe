@@ -8,7 +8,7 @@ export const users: User[] = [
     email: "maya.listener@example.com",
     role: "listener",
     subscriptionTier: "gold",
-    avatarUrl: "/mock/avatars/maya.jpg",
+    avatarUrl: "/mock/avatars/maya.png",
     createdAt: "2025-01-10T09:00:00.000Z",
     lastActiveAt: "2026-06-25T12:30:00.000Z",
     isEmailVerified: true
@@ -19,6 +19,7 @@ export const users: User[] = [
     email: "noah.basic@example.com",
     role: "listener",
     subscriptionTier: "basic",
+    avatarUrl: "/mock/avatars/noah.png",
     createdAt: "2025-04-12T10:00:00.000Z",
     lastActiveAt: "2026-06-20T14:20:00.000Z",
     isEmailVerified: false
@@ -30,7 +31,7 @@ export const users: User[] = [
     role: "artist",
     subscriptionTier: "silver",
     artistProfileId: "artist-lina",
-    avatarUrl: "/mock/avatars/lina.jpg",
+    avatarUrl: "/mock/avatars/lina.png",
     createdAt: "2024-09-15T11:00:00.000Z",
     lastActiveAt: "2026-06-24T17:45:00.000Z",
     isEmailVerified: true
@@ -41,7 +42,7 @@ export const users: User[] = [
     email: "samir.support@example.com",
     role: "support",
     subscriptionTier: "basic",
-    avatarUrl: "/mock/avatars/samir.jpg",
+    avatarUrl: "/mock/avatars/samir.png",
     createdAt: "2024-02-03T08:30:00.000Z",
     lastActiveAt: "2026-06-26T07:15:00.000Z",
     isEmailVerified: true
@@ -52,10 +53,9 @@ export const users: User[] = [
     email: "elena.admin@example.com",
     role: "admin",
     subscriptionTier: "gold",
-    avatarUrl: "/mock/avatars/elena.jpg",
+    avatarUrl: "/mock/avatars/elena.png",
     createdAt: "2023-11-01T07:00:00.000Z",
     lastActiveAt: "2026-06-26T08:00:00.000Z",
     isEmailVerified: true
   }
 ];
-
