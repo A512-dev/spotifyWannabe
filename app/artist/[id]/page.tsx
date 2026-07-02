@@ -1,9 +1,12 @@
 "use client";
 
+'use client';
+
+import { useState } from "react";
 import { useMemo, useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader, StatCard } from "@/components/shared";
-import { Badge, Button, Card, Input, Select, Table, Textarea, type TableColumn } from "@/components/ui";
+import { Badge, Button, Button, Card, Input, Select, Table, Textarea, type TableColumn } from "@/components/ui";
 import { albums as mockAlbums } from "@/data/albums";
 import { artists } from "@/data/artists";
 import { artistRevenueRecords } from "@/data/financial-records";

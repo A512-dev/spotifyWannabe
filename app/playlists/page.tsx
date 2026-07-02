@@ -19,13 +19,19 @@ export default function PlaylistsPage() {
   return (
     <MainAppLayout>
       <PageHeader
-        actions={<Button>Create playlist</Button>}
-        description="Playlist skeleton with subscription-aware limits and reusable playlist cards."
+        actions={<Button onClick={handleOpenCreate} variant="primary">Create playlist</Button>}
+        description="Manage your custom playlists and add your favorite tracks."
         title="Playlists"
       />
+      
+      {error && <p className="mt-4 text-sm font-medium text-red-500">{error}</p>}
+
       <section className="mt-6 grid gap-4 md:grid-cols-2">
-        <StatCard label="Your playlists" value={String(ownedPlaylists.length)} />
-        <StatCard label="Playlist limit" value={String(getPlaylistLimit(currentUser.subscriptionTier))} />
+        <StatCard label="Your playlists" value={String(localPlaylists.length)} />
+        <StatCard 
+          label="Playlist limit" 
+          value={getPlaylistLimit(currentUser.subscriptionTier) === Infinity ? "Unlimited" : String(getPlaylistLimit(currentUser.subscriptionTier))} 
+        />
       </section>
       <section className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Developer 2 can add create/edit flows, collaborative playlists, and sorting here. */}
@@ -33,6 +39,30 @@ export default function PlaylistsPage() {
           <PlaylistCard key={playlist.id} playlist={playlist} />
         ))}
       </section>
+
+      <Modal 
+        onClose={() => setIsModalOpen(false)} 
+        open={isModalOpen} 
+        title={modalMode === "create" ? "Create New Playlist" : "Edit Playlist Name"}
+      >
+        <form onSubmit={handleSubmit} className="space-y-6 rounded-xl bg-surface-900 p-6">
+          <Input 
+            autoFocus
+            onChange={(e) => setTitleInput(e.target.value)}
+            placeholder="Playlist Title" 
+            required
+            value={titleInput}
+          />
+          <div className="flex justify-end gap-3">
+            <Button onClick={() => setIsModalOpen(false)} type="button" variant="secondary">
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary">
+              {modalMode === "create" ? "Create" : "Save"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </MainAppLayout>
   );
 }
