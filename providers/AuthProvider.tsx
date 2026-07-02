@@ -53,6 +53,7 @@ export interface ArtistApplication {
 interface AuthContextValue {
   artistApplications: ArtistApplication[];
   currentUser: User | null;
+  deleteCurrentUser: () => AuthActionResult<null>;
   isAuthReady: boolean;
   login: (email: string, password: string) => User | null;
   logout: () => void;
@@ -139,6 +140,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     setCurrentUser(null);
   }, [setCurrentUser]);
+
+  const deleteCurrentUser = useCallback((): AuthActionResult<null> => {
+    if (!currentUser) {
+      return {
+        ok: false,
+        error: "No user is currently signed in."
+      };
+    }
+
+    const normalizedEmail = normalizeEmail(currentUser.email);
+    const nextUsers = authUsers.filter((user) => user.id !== currentUser.id);
+    const nextCredentials = credentials.filter((credential) => normalizeEmail(credential.email) !== normalizedEmail);
+
+    setAuthUsers(nextUsers);
+    setCredentials(nextCredentials);
+    writeStoredValue(USERS_STORAGE_KEY, nextUsers);
+    writeStoredValue(CREDENTIALS_STORAGE_KEY, nextCredentials);
+    setCurrentUser(null);
+
+    return {
+      ok: true,
+      data: null
+    };
+  }, [authUsers, credentials, currentUser, setCurrentUser]);
 
   const updateCurrentUser = useCallback(
     (input: UserProfileUpdateInput): AuthActionResult<User> => {
@@ -260,6 +285,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       artistApplications,
       currentUser,
+      deleteCurrentUser,
       isAuthReady,
       login,
       logout,
@@ -272,6 +298,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [
       artistApplications,
       currentUser,
+      deleteCurrentUser,
       isAuthReady,
       login,
       logout,
