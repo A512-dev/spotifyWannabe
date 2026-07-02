@@ -210,7 +210,7 @@ export default function AdminPage() {
     {
       key: "playlistLimit",
       header: "Playlist limit",
-      render: (row) => (row.playlistLimit >= 100 ? "Unlimited" : String(row.playlistLimit))
+      render: (row) => (Number.isFinite(row.playlistLimit) ? formatNumber(row.playlistLimit) : "Unlimited")
     },
     {
       key: "features",
