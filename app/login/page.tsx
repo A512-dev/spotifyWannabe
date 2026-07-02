@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import type { FormEvent } from "react";
 import { AuthLayout } from "@/components/layout/AuthLayout";
 import { Button, Input } from "@/components/ui";
@@ -18,7 +18,7 @@ function getSafeNextPath(nextPath: string | null) {
   return nextPath;
 }
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuth();
@@ -47,10 +47,7 @@ export default function LoginPage() {
   };
 
   return (
-    <AuthLayout
-      description="Use one shared login form for listeners, artists, support users, and admins."
-      title="Log in"
-    >
+    <>
       <form className="space-y-4" onSubmit={handleSubmit}>
         <Input
           autoComplete="email"
@@ -85,6 +82,19 @@ export default function LoginPage() {
           Create account
         </Link>
       </div>
+    </>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <AuthLayout
+      description="Use one shared login form for listeners, artists, support users, and admins."
+      title="Log in"
+    >
+      <Suspense fallback={<p className="text-sm text-slate-400">Loading login form...</p>}>
+        <LoginForm />
+      </Suspense>
     </AuthLayout>
   );
 }
