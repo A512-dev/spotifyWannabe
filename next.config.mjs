@@ -1,8 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Keep the first phase predictable for all teammates.
-  reactStrictMode: true
+  allowedDevOrigins: ['10.161.194.237'],
 };
 
 export default nextConfig;
-

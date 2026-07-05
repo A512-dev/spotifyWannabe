@@ -38,12 +38,13 @@ export default function HomePage() {
 
       <section className="mt-8">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-slate-50">Recommended Tracks</h2>
-          <Link className="text-sm font-semibold text-slate-400 hover:text-slate-50" href="/music">
+          <h2 className="text-xl font-bold text-white">Recommended Tracks</h2>
+          <Link className="text-sm font-semibold text-white/70 hover:text-white transition-colors" href="/music">
             View All
           </Link>
         </div>
-        <div className="grid gap-3 lg:grid-cols-2">
+        {/* تغییر کلیدی: تبدیل گرید به یک لیست عمودی */}
+        <div className="flex flex-col gap-3">
           {recommendedTracks.map((track) => (
             <TrackCard 
               artistName={getArtistName(track.artistId)} 
@@ -55,7 +56,7 @@ export default function HomePage() {
       </section>
 
       <section className="mt-8">
-        <h2 className="mb-4 text-xl font-bold text-slate-50">Featured Albums</h2>
+        <h2 className="mb-4 text-xl font-bold text-white">Featured Albums</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {featuredAlbums.map((album) => (
             <Link href={`/music/album/${album.id}`} key={album.id}>
