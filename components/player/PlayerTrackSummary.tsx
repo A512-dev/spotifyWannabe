@@ -25,38 +25,41 @@ export function PlayerTrackSummary({ track }: PlayerTrackSummaryProps) {
 
   return (
     <div className="flex w-full items-center gap-3">
-      <div className="h-12 w-12 sm:h-14 sm:w-14 shrink-0 overflow-hidden rounded-md bg-surface-700 shadow-lg">
+      {/* هماهنگ‌سازی پس‌زمینه باکس کاور با تم بنفش */}
+      <div className="h-12 w-12 sm:h-14 sm:w-14 shrink-0 overflow-hidden rounded-md bg-brand-primary/40 shadow-lg border border-white/10">
         {track.coverImageUrl ? (
           <img alt={track.title} className="h-full w-full object-cover" src={track.coverImageUrl} />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-[10px] text-slate-500">
+          <div className="flex h-full w-full items-center justify-center text-[10px] text-white/50">
             Cover
           </div>
         )}
       </div>
       <div className="flex min-w-0 flex-col justify-center">
-        <span className="truncate text-sm font-semibold text-slate-50 hover:underline cursor-pointer">
+        {/* سفید و درخشان کردن نام آهنگ */}
+        <span className="truncate text-sm font-bold text-white hover:underline cursor-pointer">
           {track.title}
         </span>
         
-        <div className="flex items-center gap-1 truncate text-xs text-slate-400">
+        {/* روشن و شفاف کردن متون خواننده و آلبوم برای کنتراست بالاتر */}
+        <div className="flex items-center gap-1 truncate text-xs text-white/80 font-medium">
           {artist ? (
             <Link
-              className="hover:text-slate-300 hover:underline"
+              className="hover:text-white hover:underline transition-colors"
               href={`/artist/${track.artistId}`}
               onClick={(e) => e.stopPropagation()}
             >
               {artist.stageName}
             </Link>
           ) : (
-            <span>Unknown Artist</span>
+            <span className="text-white/60">Unknown Artist</span>
           )}
           
           {album && (
             <>
-              <span className="text-[10px]">•</span>
+              <span className="text-[10px] text-white/40">•</span>
               <Link
-                className="truncate hover:text-slate-300 hover:underline"
+                className="truncate hover:text-white hover:underline transition-colors"
                 href={`/music/album/${album.id}`}
                 onClick={(e) => e.stopPropagation()}
               >
@@ -66,8 +69,9 @@ export function PlayerTrackSummary({ track }: PlayerTrackSummaryProps) {
           )}
         </div>
         
+        {/* تغییر رنگ استریم به کرمی/هلویی اختصاصی پالت شما */}
         {isGoldUser && (
-          <span className="mt-0.5 flex items-center gap-1 text-[10px] font-medium text-amber-500">
+          <span className="mt-0.5 flex items-center gap-1 text-[10px] font-bold text-yellow-400 drop-shadow-sm">
             <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-7.5c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
             </svg>

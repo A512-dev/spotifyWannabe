@@ -38,7 +38,7 @@ export function PlayerControlsPlaceholder({
         <button
           className={`h-8 w-8 items-center justify-center rounded-full transition-colors ${
             showExtraControls ? "flex" : "hidden sm:flex"
-          } ${shuffle ? "text-green-500" : "text-slate-400 hover:text-slate-50"}`}
+          } ${shuffle ? "text-brand-accent drop-shadow" : "text-white/70 hover:text-white"}`}
           onClick={onShuffleToggle}
         >
           <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 16 16">
@@ -49,7 +49,7 @@ export function PlayerControlsPlaceholder({
 
         {/* Previous */}
         <button
-          className="flex h-8 w-8 items-center justify-center text-slate-400 transition-colors hover:text-slate-50"
+          className="flex h-8 w-8 items-center justify-center text-white/70 transition-colors hover:text-white"
           onClick={onPrevious}
         >
           <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 16 16">
@@ -59,7 +59,7 @@ export function PlayerControlsPlaceholder({
 
         {/* Play/Pause */}
         <button
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-black transition-transform hover:scale-105 sm:h-10 sm:w-10"
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-brand-primary transition-transform hover:scale-105 shadow-md sm:h-10 sm:w-10"
           onClick={onPlayPause}
         >
           {isPlaying ? (
@@ -75,7 +75,7 @@ export function PlayerControlsPlaceholder({
 
         {/* Next */}
         <button
-          className="flex h-8 w-8 items-center justify-center text-slate-400 transition-colors hover:text-slate-50"
+          className="flex h-8 w-8 items-center justify-center text-white/70 transition-colors hover:text-white"
           onClick={onNext}
         >
           <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 16 16">
@@ -87,7 +87,7 @@ export function PlayerControlsPlaceholder({
         <button
           className={`h-8 w-8 items-center justify-center rounded-full transition-colors ${
             showExtraControls ? "flex" : "hidden sm:flex"
-          } ${repeat !== "off" ? "text-green-500" : "text-slate-400 hover:text-slate-50"}`}
+          } ${repeat !== "off" ? "text-brand-accent drop-shadow" : "text-white/70 hover:text-white"}`}
           onClick={onRepeatToggle}
           title={repeat === "off" ? "Enable repeat" : repeat === "all" ? "Enable repeat one" : "Disable repeat"}
         >
@@ -105,16 +105,16 @@ export function PlayerControlsPlaceholder({
       </div>
 
       <div className="group hidden w-full items-center gap-2 sm:flex">
-        <span className="w-10 text-right text-xs text-slate-400">{formatDuration(progress)}</span>
+        <span className="w-10 text-right text-xs text-white/80 font-medium">{formatDuration(progress)}</span>
         <input
-          className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-surface-600 accent-white transition-all group-hover:accent-green-500"
+          className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-brand-primary/40 accent-white transition-all group-hover:accent-brand-accent"
           max={duration}
           min="0"
           onChange={(e) => onSeek(Number(e.target.value))}
           type="range"
           value={progress}
         />
-        <span className="w-10 text-left text-xs text-slate-400">{formatDuration(duration)}</span>
+        <span className="w-10 text-left text-xs text-white/80 font-medium">{formatDuration(duration)}</span>
       </div>
     </div>
   );

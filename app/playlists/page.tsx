@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import Link from "next/link";
 import { MainAppLayout } from "@/components/layout/MainAppLayout";
-import { EmptyState, PageHeader, PlaylistCard, StatCard, TrackCard } from "@/components/shared";
+import { EmptyState, PageHeader, PlaylistCard, TrackCard } from "@/components/shared";
 import { Button, Input, Modal } from "@/components/ui";
 import { artists } from "@/data/artists";
 import { playlists as defaultPlaylists } from "@/data/playlists";
@@ -41,7 +41,7 @@ export default function PlaylistsPage() {
   }, [currentUser]);
 
   if (!currentUser) {
-    return <MainAppLayout>Loading playlists...</MainAppLayout>;
+    return <MainAppLayout><div className="text-white">Loading playlists...</div></MainAppLayout>;
   }
 
   const playlistLimit = getPlaylistLimit(currentUser.subscriptionTier);
@@ -74,7 +74,6 @@ export default function PlaylistsPage() {
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
     const title = titleInput.trim();
 
     if (!title) {
@@ -105,11 +104,7 @@ export default function PlaylistsPage() {
       savePlaylists(
         localPlaylists.map((playlist) =>
           playlist.id === currentPlaylistId
-            ? {
-                ...playlist,
-                title,
-                updatedAt: new Date().toISOString()
-              }
+            ? { ...playlist, title, updatedAt: new Date().toISOString() }
             : playlist
         )
       );
@@ -127,7 +122,7 @@ export default function PlaylistsPage() {
     <MainAppLayout>
       <PageHeader
         actions={
-          <Button onClick={handleOpenCreate} variant="primary">
+          <Button onClick={handleOpenCreate} className="bg-brand-primary hover:bg-brand-secondary text-white font-medium shadow-md transition-all">
             Create playlist
           </Button>
         }
@@ -135,51 +130,72 @@ export default function PlaylistsPage() {
         title="Playlists"
       />
 
-      {error ? <p className="mt-4 text-sm font-medium text-red-300">{error}</p> : null}
+      <div className="mt-4 flex flex-wrap gap-2.5 items-center">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/[0.04] border border-white/10 text-white/90 shadow-sm">
+          <span className="h-1.5 w-1.5 rounded-full bg-brand-secondary animate-pulse"></span>
+          Your playlists: <strong className="text-white ml-0.5">{localPlaylists.length}</strong>
+        </span>
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/[0.04] border border-white/10 text-white/90 shadow-sm">
+          Limit: <strong className="text-white ml-0.5">{localPlaylists.length}/{playlistLimit}</strong>
+        </span>
+      </div>
 
-      <section className="mt-6 grid gap-4 md:grid-cols-2">
-        <StatCard label="Your playlists" value={String(localPlaylists.length)} />
-        <StatCard label="Playlist limit" value={String(playlistLimit)} />
-      </section>
+      {error ? <p className="mt-4 text-sm font-medium text-red-400 bg-red-500/10 border border-red-500/20 px-4 py-2 rounded-lg">{error}</p> : null}
 
       <section className="mt-8">
         {localPlaylists.length === 0 ? (
-          <EmptyState
-            action={
-              <Button onClick={handleOpenCreate} variant="primary">
-                Create first playlist
-              </Button>
-            }
-            description="Create your first playlist and add your favorite tracks to it."
-            title="No playlists found"
-          />
+          <div className="rounded-xl border border-white/5 bg-white/[0.02] p-8 shadow-inner">
+            <EmptyState
+              action={
+                <Button onClick={handleOpenCreate} className="bg-brand-primary text-white hover:bg-brand-secondary">
+                  Create first playlist
+                </Button>
+              }
+              description="Create your first playlist and add your favorite tracks to it."
+              title="No playlists found"
+            />
+          </div>
         ) : (
-          <div className="grid gap-6">
+          /* تغییر معماری: ردیف شدن ستون‌ها از چپ به راست با اسکرول افقی در صورت شلوغ شدن */
+          <div className="flex flex-row gap-6 overflow-x-auto pb-6 scrollbar-thin">
             {localPlaylists.map((playlist) => (
-              <div key={playlist.id} className="rounded-lg border border-surface-700 bg-surface-800/40 p-4">
-                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                  <div className="w-full md:w-72">
-                    <PlaylistCard playlist={playlist} />
-                  </div>
-                  <div className="flex flex-wrap gap-2">
+              /* ستون مجزا برای هر پلی‌لیست با عرض ثابت دقیقا به اندازه کارت (w-72 یا w-80) */
+              <div key={playlist.id} className="w-[320px] shrink-0 rounded-xl border border-white/5 bg-white/[0.02] p-4 shadow-xl flex flex-col gap-4">
+                
+                {/* بخش کارت بالایی پلی‌لیست */}
+                <div className="flex flex-col gap-3 relative group">
+                  <PlaylistCard playlist={playlist} />
+                  
+                  {/* دکمه‌های مدیریتی به صورت کپسول فشرده زیر کارت */}
+                  <div className="flex items-center justify-between gap-1 border-t border-white/5 pt-3">
                     <Link
-                      className="inline-flex h-8 items-center justify-center rounded-md bg-surface-700 px-3 text-sm font-medium text-slate-50 transition hover:bg-surface-600"
+                      className="inline-flex h-7 items-center justify-center rounded-md bg-white/10 px-2.5 text-[11px] font-bold text-white transition hover:bg-white/20"
                       href={`/music?addToPlaylist=${playlist.id}`}
                     >
                       Add track
                     </Link>
-                    <Button onClick={() => handleOpenEdit(playlist)} size="sm" variant="secondary">
-                      Edit name
-                    </Button>
-                    <Button onClick={() => handleDelete(playlist.id)} size="sm" variant="danger">
-                      Delete
-                    </Button>
+                    <div className="flex gap-1">
+                      <button 
+                        onClick={() => handleOpenEdit(playlist)} 
+                        className="h-7 px-2 rounded-md text-[11px] font-bold text-white/80 border border-white/10 hover:bg-white/10 transition-colors"
+                      >
+                        Edit
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(playlist.id)} 
+                        className="h-7 px-2 rounded-md text-[11px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/10 hover:bg-rose-500/20 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
-                <div className="mt-5 border-t border-surface-700 pt-4">
-                  <h3 className="mb-3 text-sm font-semibold text-slate-300">Tracks in this playlist</h3>
+
+                {/* بخش لیست فشرده آهنگ‌های زیر همان پلی‌لیست */}
+                <div className="border-t border-white/5 pt-3 flex-1 flex flex-col min-h-[150px]">
+                  <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-white/50">Tracks ({playlist.itemIds.length})</h3>
                   {playlist.itemIds.length > 0 ? (
-                    <div className="grid gap-3 lg:grid-cols-2">
+                    <div className="flex flex-col gap-1.5 max-h-[320px] overflow-y-auto pr-1">
                       {playlist.itemIds.map((trackId) => {
                         const track = tracks.find((item) => item.id === trackId);
 
@@ -198,7 +214,9 @@ export default function PlaylistsPage() {
                       })}
                     </div>
                   ) : (
-                    <p className="text-sm italic text-slate-500">No tracks added to this playlist yet.</p>
+                    <p className="text-xs italic text-white/30 py-4 text-center border border-dashed border-white/5 rounded-lg my-auto">
+                      Empty playlist
+                    </p>
                   )}
                 </div>
               </div>
@@ -223,10 +241,12 @@ export default function PlaylistsPage() {
             value={titleInput}
           />
           <div className="flex justify-end gap-2">
-            <Button onClick={() => setIsModalOpen(false)} type="button" variant="ghost">
+            <Button onClick={() => setIsModalOpen(false)} type="button" variant="ghost" className="text-white/60 hover:text-white">
               Cancel
             </Button>
-            <Button type="submit">{modalMode === "create" ? "Create" : "Save"}</Button>
+            <Button type="submit" className="bg-brand-primary text-white hover:bg-brand-secondary">
+              {modalMode === "create" ? "Create" : "Save"}
+            </Button>
           </div>
         </form>
       </Modal>

@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
+  color-scheme: dark; /* تغییر به حالت دارک برای هماهنگی با بنفش تیره */
 }
 
 * {
@@ -17,8 +17,8 @@ body {
 
 body {
   margin: 0;
-  background: #121212;
-  color: #f8fafc;
+  background: #1a0b2e; /* بنفش تیره عمیق */
+  color: #f8fafc;    /* متن‌های پیش‌فرض سفید/روشن شوند تا کاملاً خوانا باشند */
 }
 
 a {
@@ -32,4 +32,3 @@ textarea,
 select {
   font: inherit;
 }
-
