@@ -19,6 +19,7 @@ interface AlbumTrackDraft {
   title: string;
   audioFileName: string;
   lyrics: string;
+  existingTrackId?: string;
 }
 
 interface DraftRelease {
@@ -52,12 +53,19 @@ interface CatalogReleaseGroup {
 
 const ACCEPTED_AUDIO_FORMATS = ["mp3", "wav", "flac"];
 
-function createAlbumTrackDraft(index = 1, fileName = ""): AlbumTrackDraft {
+function createAlbumTrackDraft(
+  index = 1,
+  fileName = "",
+  existingTrackId?: string,
+  title?: string,
+  lyrics = ""
+): AlbumTrackDraft {
   return {
-    id: `album-track-${Date.now()}-${index}`,
-    title: fileName ? getFileNameWithoutExtension(fileName) : "",
+    id: existingTrackId ? `edit-${existingTrackId}` : `album-track-${Date.now()}-${index}`,
+    title: title ?? (fileName ? getFileNameWithoutExtension(fileName) : ""),
     audioFileName: fileName,
-    lyrics: ""
+    lyrics,
+    existingTrackId
   };
 }
 
@@ -77,6 +85,26 @@ function createInitialDraft(): DraftRelease {
 
 function getFileNameWithoutExtension(fileName: string) {
   return fileName.replace(/\.[^/.]+$/, "").replace(/[-_]+/g, " ").trim();
+}
+
+function getFileNameFromUrl(url?: string) {
+  if (!url) {
+    return "";
+  }
+
+  return decodeURIComponent(url.split("/").pop() ?? "");
+}
+
+function getUpdatedMediaUrl(fileName: string, previousUrl?: string) {
+  if (!fileName) {
+    return previousUrl;
+  }
+
+  if (previousUrl && getFileNameFromUrl(previousUrl) === fileName) {
+    return previousUrl;
+  }
+
+  return `/mock/uploads/${fileName}`;
 }
 
 function isAcceptedAudioFile(fileName: string) {
@@ -145,6 +173,7 @@ export default function ArtistDashboardPage() {
 
   const [draft, setDraft] = useState<DraftRelease>(() => createInitialDraft());
   const [formMessage, setFormMessage] = useState<string>("");
+  const [editingReleaseId, setEditingReleaseId] = useState<string | null>(null);
 
   const artistTracks = useMemo(() => {
     if (!currentArtist) {
@@ -214,7 +243,15 @@ export default function ArtistDashboardPage() {
 
   const totalStreams = artistTracks.reduce((sum, track) => sum + track.playCount, 0);
   const totalRevenueCents = artistRevenue.reduce((sum, record) => sum + record.netRevenueCents, 0);
-  const localAlbumCount = new Set(artistTracks.filter((track) => track.albumId).map((track) => track.albumId)).size;
+  const existingArtistAlbumIds = new Set(artistAlbums.map((album) => album.id));
+  const localAlbumIds = artistTracks.reduce<string[]>((albumIds, track) => {
+    if (track.albumId && !existingArtistAlbumIds.has(track.albumId)) {
+      albumIds.push(track.albumId);
+    }
+
+    return albumIds;
+  }, []);
+  const localAlbumCount = new Set(localAlbumIds).size;
   const canManageCatalog = currentArtist?.approvalStatus === "approved";
 
   const updateDraft = (key: keyof DraftRelease, value: string | AlbumTrackDraft[]) => {
@@ -297,6 +334,171 @@ export default function ArtistDashboardPage() {
     }));
   };
 
+  const replaceReleaseTracks = (oldTrackIds: string[], updatedTracks: ManagedTrack[]) => {
+    const oldTrackIdSet = new Set(oldTrackIds);
+
+    setManagedTracks((currentTracks) => {
+      const nextTracks: ManagedTrack[] = [];
+      let insertedUpdatedRelease = false;
+
+      currentTracks.forEach((track) => {
+        if (oldTrackIdSet.has(track.id)) {
+          if (!insertedUpdatedRelease) {
+            nextTracks.push(...updatedTracks);
+            insertedUpdatedRelease = true;
+          }
+
+          return;
+        }
+
+        nextTracks.push(track);
+      });
+
+      if (!insertedUpdatedRelease) {
+        return [...updatedTracks, ...currentTracks];
+      }
+
+      return nextTracks;
+    });
+  };
+
+  const handleStartEditRelease = (release: CatalogReleaseGroup) => {
+    const firstTrack = release.tracks[0];
+
+    if (!firstTrack) {
+      return;
+    }
+
+    setEditingReleaseId(release.id);
+
+    setDraft({
+      title: release.releaseType === "album" ? release.title : firstTrack.title,
+      releaseType: release.releaseType,
+      genre: release.genre ?? firstTrack.genre ?? "Pop",
+      releaseYear: new Date(firstTrack.releaseDate).getFullYear().toString(),
+      collaborators: firstTrack.collaborators ?? "",
+      lyrics: release.releaseType === "single" ? firstTrack.lyrics ?? "" : "",
+      coverFileName: "",
+      audioFileName: release.releaseType === "single" ? getFileNameFromUrl(firstTrack.audioUrl) : "",
+      albumTracks:
+        release.releaseType === "album"
+          ? release.tracks.map((track, index) =>
+              createAlbumTrackDraft(index + 1, getFileNameFromUrl(track.audioUrl), track.id, track.title, track.lyrics ?? "")
+            )
+          : [createAlbumTrackDraft()]
+    });
+
+    setFormMessage(`Editing ${release.releaseType}: ${release.title}`);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingReleaseId(null);
+    setDraft(createInitialDraft());
+    setFormMessage("");
+  };
+
+  const handleSaveEditedRelease = () => {
+    if (!editingReleaseId || !currentArtist) {
+      return;
+    }
+
+    const release = catalogReleaseGroups.find((catalogRelease) => catalogRelease.id === editingReleaseId);
+
+    if (!release) {
+      setFormMessage("Selected release was not found.");
+      return;
+    }
+
+    if (!draft.title.trim()) {
+      setFormMessage(draft.releaseType === "album" ? "Album title is required." : "Release title is required.");
+      return;
+    }
+
+    const normalizedReleaseDate = `${draft.releaseYear || new Date().getFullYear()}-01-01T00:00:00.000Z`;
+    const oldTrackIds = release.tracks.map((track) => track.id);
+
+    if (release.releaseType === "single") {
+      const existingTrack = release.tracks[0];
+
+      if (!existingTrack) {
+        setFormMessage("Selected single was not found.");
+        return;
+      }
+
+      if (!draft.audioFileName || !isAcceptedAudioFile(draft.audioFileName)) {
+        setFormMessage("Please select a valid MP3, WAV, or FLAC audio file.");
+        return;
+      }
+
+      const updatedSingle: ManagedTrack = {
+        ...existingTrack,
+        title: draft.title.trim(),
+        genre: draft.genre,
+        lyrics: draft.lyrics.trim(),
+        collaborators: draft.collaborators.trim(),
+        releaseDate: normalizedReleaseDate,
+        audioUrl: getUpdatedMediaUrl(draft.audioFileName, existingTrack.audioUrl) ?? existingTrack.audioUrl,
+        coverImageUrl: getUpdatedMediaUrl(draft.coverFileName, existingTrack.coverImageUrl)
+      };
+
+      replaceReleaseTracks(oldTrackIds, [updatedSingle]);
+      setEditingReleaseId(null);
+      setDraft(createInitialDraft());
+      setFormMessage("Single release was updated.");
+      return;
+    }
+
+    const activeAlbumTracks = draft.albumTracks.filter((track) => track.title.trim() || track.audioFileName);
+
+    if (activeAlbumTracks.length < 2) {
+      setFormMessage("Album releases need at least two tracks.");
+      return;
+    }
+
+    const incompleteTrack = activeAlbumTracks.find((track) => !track.title.trim() || !track.audioFileName);
+
+    if (incompleteTrack) {
+      setFormMessage("Each album track needs both a title and a valid audio file.");
+      return;
+    }
+
+    const invalidTrack = activeAlbumTracks.find((track) => !isAcceptedAudioFile(track.audioFileName));
+
+    if (invalidTrack) {
+      setFormMessage("Each album track file must be MP3, WAV, or FLAC.");
+      return;
+    }
+
+    const previousTracksById = new Map(release.tracks.map((track) => [track.id, track]));
+
+    const updatedAlbumTracks: ManagedTrack[] = activeAlbumTracks.map((albumTrack, index) => {
+      const previousTrack = albumTrack.existingTrackId ? previousTracksById.get(albumTrack.existingTrackId) : undefined;
+
+      return {
+        id: previousTrack?.id ?? `${editingReleaseId}-track-${Date.now()}-${index + 1}`,
+        title: albumTrack.title.trim(),
+        artistId: currentArtist.id,
+        albumId: editingReleaseId,
+        durationSeconds: previousTrack?.durationSeconds ?? 0,
+        audioUrl: getUpdatedMediaUrl(albumTrack.audioFileName, previousTrack?.audioUrl) ?? `/mock/uploads/${albumTrack.audioFileName}`,
+        coverImageUrl: getUpdatedMediaUrl(draft.coverFileName, previousTrack?.coverImageUrl),
+        playCount: previousTrack?.playCount ?? 0,
+        explicit: previousTrack?.explicit ?? false,
+        releaseDate: normalizedReleaseDate,
+        localStatus: previousTrack?.localStatus ?? "draft",
+        genre: draft.genre,
+        lyrics: albumTrack.lyrics.trim(),
+        collaborators: draft.collaborators.trim(),
+        albumTitle: draft.title.trim()
+      };
+    });
+
+    replaceReleaseTracks(oldTrackIds, updatedAlbumTracks);
+    setEditingReleaseId(null);
+    setDraft(createInitialDraft());
+    setFormMessage("Album release was updated.");
+  };
+
   const handleCreateDraft = () => {
     if (!currentArtist) {
       setFormMessage("No artist profile is linked to this account.");
@@ -364,6 +566,15 @@ export default function ArtistDashboardPage() {
 
   const handleDeleteRelease = (trackIds: string[]) => {
     setManagedTracks((currentTracks) => currentTracks.filter((track) => !trackIds.includes(track.id)));
+
+    if (editingReleaseId) {
+      const editingRelease = catalogReleaseGroups.find((release) => release.id === editingReleaseId);
+      const editingTrackIds = editingRelease?.tracks.map((track) => track.id) ?? [];
+
+      if (editingTrackIds.some((trackId) => trackIds.includes(trackId))) {
+        handleCancelEdit();
+      }
+    }
   };
 
   const revenueColumns: TableColumn<(typeof artistRevenueRecords)[number]>[] = [
@@ -462,9 +673,13 @@ export default function ArtistDashboardPage() {
 
           <section className="mt-6 grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
             <Card>
-              <h2 className="text-lg font-semibold text-slate-50">Create release draft</h2>
+              <h2 className="text-lg font-semibold text-slate-50">
+                {editingReleaseId ? "Edit release" : "Create release draft"}
+              </h2>
               <p className="mt-2 text-sm text-slate-400">
-                Phase 1 stores this draft in local component state. Backend upload and media storage will replace this flow in Phase 2.
+                {editingReleaseId
+                  ? "Update this release metadata, track list, lyrics, and media placeholders."
+                  : "Phase 1 stores this draft in local component state. Backend upload and media storage will replace this flow in Phase 2."}
               </p>
 
               <div className="mt-5 space-y-4">
@@ -479,7 +694,7 @@ export default function ArtistDashboardPage() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Select
-                    disabled={!canManageCatalog}
+                    disabled={!canManageCatalog || Boolean(editingReleaseId)}
                     label="Release type"
                     name="releaseType"
                     onChange={(event) => handleReleaseTypeChange(event.target.value as ReleaseType)}
@@ -627,9 +842,17 @@ export default function ArtistDashboardPage() {
 
                 {formMessage ? <p className="text-sm text-brand-500">{formMessage}</p> : null}
 
-                <Button disabled={!canManageCatalog} onClick={handleCreateDraft}>
-                  Add draft release
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button disabled={!canManageCatalog} onClick={editingReleaseId ? handleSaveEditedRelease : handleCreateDraft}>
+                    {editingReleaseId ? "Save changes" : "Add draft release"}
+                  </Button>
+
+                  {editingReleaseId ? (
+                    <Button onClick={handleCancelEdit} type="button" variant="secondary">
+                      Cancel edit
+                    </Button>
+                  ) : null}
+                </div>
               </div>
             </Card>
 
@@ -674,6 +897,10 @@ export default function ArtistDashboardPage() {
                             </div>
 
                             <div className="flex flex-wrap gap-2">
+                              <Button onClick={() => handleStartEditRelease(release)} size="sm" variant="secondary">
+                                Edit
+                              </Button>
+
                               <Button
                                 disabled={releaseStatus === "published"}
                                 onClick={() => handlePublishRelease(releaseTrackIds)}
@@ -682,6 +909,7 @@ export default function ArtistDashboardPage() {
                               >
                                 {isAlbum ? "Publish album" : "Publish"}
                               </Button>
+
                               <Button onClick={() => handleDeleteRelease(releaseTrackIds)} size="sm" variant="danger">
                                 {isAlbum ? "Delete album" : "Delete"}
                               </Button>
