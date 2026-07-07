@@ -63,6 +63,7 @@ export interface Track {
   playCount: number;
   explicit: boolean;
   releaseDate: ISODateString;
+  lyrics?: string;
 }
 
 export interface Album {

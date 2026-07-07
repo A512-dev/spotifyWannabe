@@ -11,7 +11,31 @@ export const tracks: Track[] = [
     coverImageUrl: "/mock/albums/after-midnight.png",
     playCount: 582100,
     explicit: false,
-    releaseDate: "2026-02-14T00:00:00.000Z"
+    releaseDate: "2026-02-14T00:00:00.000Z",
+    // اضافه شدن متن آهنگ برای تست پلیر جدید
+    lyrics: `[Verse 1]
+Walking through the crowded streets tonight
+Underneath the purple neon light
+The city whispers secrets in the dark
+But all I'm looking for is just a spark
+
+[Chorus]
+And the neon rain keeps falling down
+Washing all the shadows from this town
+Yeah, the neon rain will clear my mind
+Leaving all the broken days behind
+
+[Verse 2]
+Reflection in the puddles on the floor
+I don't wanna look back anymore
+The synthesizers playing in my head
+Remembering the words you never said
+
+[Chorus]
+And the neon rain keeps falling down
+Washing all the shadows from this town
+Yeah, the neon rain will clear my mind
+Leaving all the broken days behind`
   },
   {
     id: "track-glass-hearts",

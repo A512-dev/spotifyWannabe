@@ -23,6 +23,7 @@ export function PlayerShell() {
   const [activeQueue, setActiveQueue] = useState<Track[]>(tracks);
   const [isMobileExpanded, setIsMobileExpanded] = useState(false);
   const [isQueueOpen, setIsQueueOpen] = useState(false);
+  const [isLyricsOpen, setIsLyricsOpen] = useState(false); // استیت جدید برای کنترل متن آهنگ
   const [progress, setProgress] = useState(0);
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState<"off" | "all" | "one">("off");
@@ -30,6 +31,7 @@ export function PlayerShell() {
 
   useEffect(() => {
     setProgress(0);
+    setIsLyricsOpen(false); // با تغییر آهنگ، پنل متن بازنشانی شود
     const queueJson = localStorage.getItem("soundwave_active_queue");
     if (queueJson) {
       try {
@@ -170,7 +172,7 @@ export function PlayerShell() {
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4 relative">
           
           <div className="flex items-center justify-between w-full sm:w-[30%] gap-4">
-            {/* اطلاعات آهنگ (در گوشی کلیک روی این بخش پلیر تمام‌صفحه را باز می‌کند) */}
+            {/* اطلاعات آهنگ */}
             <div 
               className="flex min-w-0 flex-1 cursor-pointer"
               onClick={() => setIsMobileExpanded(true)}
@@ -178,7 +180,7 @@ export function PlayerShell() {
               <PlayerTrackSummary track={currentTrack} />
             </div>
 
-            {/* کنترلرهای ساده مینی‌پلیر موبایل (بدون نوار پخش) */}
+            {/* کنترلرهای ساده مینی‌پلیر موبایل */}
             <div className="flex items-center gap-2 sm:hidden shrink-0">
               <button onClick={togglePlayPause} className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#1a0b2e] shadow hover:scale-105 transition-transform">
                 {playerState.isPlaying ? (
@@ -193,7 +195,7 @@ export function PlayerShell() {
             </div>
           </div>
 
-          {/* کنترلرهای دسکتاپ به همراه نوار پخش داخلیِ خود کامپوننت */}
+          {/* کنترلرهای دسکتاپ */}
           <div className="hidden sm:flex flex-1 items-center justify-center gap-4 px-4">
             <PlayerControlsPlaceholder 
               duration={currentTrack.durationSeconds}
@@ -210,15 +212,35 @@ export function PlayerShell() {
             />
           </div>
 
-          <div className="hidden w-[30%] items-center justify-end gap-3 sm:flex relative">
+          <div className="hidden w-[30%] items-center justify-end gap-3.5 sm:flex relative">
+            {/* دکمه اختصاصی شیشه‌ای متن آهنگ - فقط در صورت وجود کلمات رندر می‌شود */}
+            {currentTrack.lyrics && (
+              <button 
+                className={`transition-all p-1 rounded-md hover:bg-white/5 ${isLyricsOpen ? 'text-brand-secondary scale-105' : 'text-white/60 hover:text-white'}`}
+                onClick={() => {
+                  setIsLyricsOpen(!isLyricsOpen);
+                  if (isQueueOpen) setIsQueueOpen(false);
+                }}
+                title="Lyrics"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                </svg>
+              </button>
+            )}
+
             <button 
-              className={`transition-colors ${isQueueOpen ? 'text-brand-secondary' : 'text-white/60 hover:text-white'}`}
-              onClick={() => setIsQueueOpen(!isQueueOpen)}
+              className={`transition-colors p-1 rounded-md hover:bg-white/5 ${isQueueOpen ? 'text-brand-secondary' : 'text-white/60 hover:text-white'}`}
+              onClick={() => {
+                setIsQueueOpen(!isQueueOpen);
+                if (isLyricsOpen) setIsLyricsOpen(false);
+              }}
             >
               <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 16 16">
                 <path d="M15 15H1v-1.5h14V15zm0-4.5H1V9h14v1.5zm-14-7A2.5 2.5 0 0 1 3.5 1h9a2.5 2.5 0 0 1 0 5h-9A2.5 2.5 0 0 1 1 3.5zm2.5-1a1 1 0 0 0 0 2h9a1 1 0 1 0 0-2h-9z" />
               </svg>
             </button>
+            
             <div className="group flex items-center">
               <input 
                 className="h-1.5 w-24 cursor-pointer appearance-none rounded-full bg-white/10 accent-white transition-all group-hover:accent-brand-secondary" 
@@ -230,6 +252,17 @@ export function PlayerShell() {
               />
             </div>
 
+            {/* پاپ‌آپ شیشه‌ای نمایش متن آهنگ */}
+            {isLyricsOpen && currentTrack.lyrics && (
+              <div className="absolute bottom-[calc(100%+1.5rem)] right-0 w-80 max-h-[350px] rounded-xl border border-white/10 bg-[#160926]/95 p-4.5 shadow-2xl backdrop-blur-xl text-white flex flex-col gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest border-b border-white/5 pb-2">Lyrics</h3>
+                <div className="flex-1 overflow-y-auto pr-1 text-sm leading-relaxed whitespace-pre-line text-white/90 font-medium scrollbar-thin select-none">
+                  {currentTrack.lyrics}
+                </div>
+              </div>
+            )}
+
+            {/* پاپ‌آپ صف پخش */}
             {isQueueOpen && (
               <div className="absolute bottom-[calc(100%+1rem)] right-0 w-80 rounded-xl border border-white/10 bg-[#1a0b2e]/95 p-4 shadow-2xl backdrop-blur-xl text-white">
                 <h3 className="mb-4 text-xs font-bold text-white/50 uppercase tracking-wider">Next In Queue</h3>
@@ -255,10 +288,10 @@ export function PlayerShell() {
         </div>
       </footer>
 
-      {/* پلیر تمام‌صفحه اختصاصی موبایل (Expanded View) */}
+      {/* پلیر تمام‌صفحه اختصاصی موبایل */}
       {isMobileExpanded && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-[#160926]/95 p-6 backdrop-blur-3xl sm:hidden text-white">
-          <div className="mb-8 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex flex-col bg-[#160926]/95 p-6 backdrop-blur-3xl sm:hidden text-white overflow-y-auto">
+          <div className="mb-6 flex items-center justify-between shrink-0">
             <button className="text-white/70 hover:text-white" onClick={() => setIsMobileExpanded(false)}>
               <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z" />
@@ -268,8 +301,8 @@ export function PlayerShell() {
             <div className="w-6 h-6" /> 
           </div>
 
-          <div className="flex flex-1 flex-col justify-center gap-8 max-w-sm mx-auto w-full">
-            <div className="aspect-square w-full overflow-hidden rounded-3xl bg-white/5 shadow-2xl border border-white/10">
+          <div className="flex flex-1 flex-col justify-center gap-6 max-w-sm mx-auto w-full pb-8">
+            <div className="aspect-square w-full overflow-hidden rounded-3xl bg-white/5 shadow-2xl border border-white/10 shrink-0">
               {currentTrack.coverImageUrl ? (
                 <img alt={currentTrack.title} className="h-full w-full object-cover" src={currentTrack.coverImageUrl} />
               ) : (
@@ -277,7 +310,7 @@ export function PlayerShell() {
               )}
             </div>
 
-            <div className="text-center">
+            <div className="text-center shrink-0">
               <h2 className="truncate text-2xl font-black text-white">{currentTrack.title}</h2>
               <div className="flex items-center justify-center gap-2 text-sm text-white/60 mt-2">
                 {currentArtist ? (
@@ -294,8 +327,7 @@ export function PlayerShell() {
               </div>
             </div>
 
-            <div className="w-full flex flex-col gap-6 mt-2">
-              {/* نوار پخش انحصاری برای صفحه بزرگ موبایل */}
+            <div className="w-full flex flex-col gap-5 mt-1 shrink-0">
               <div className="flex w-full items-center gap-3">
                 <span className="w-10 text-right text-xs text-white/60 font-semibold">{formatDuration(progress)}</span>
                 <input
@@ -309,7 +341,6 @@ export function PlayerShell() {
                 <span className="w-10 text-left text-xs text-white/60 font-semibold">{formatDuration(currentTrack.durationSeconds)}</span>
               </div>
 
-              {/* دکمه‌های کنترل موسیقی */}
               <PlayerControlsPlaceholder 
                 duration={currentTrack.durationSeconds}
                 isPlaying={playerState.isPlaying} 
@@ -324,6 +355,16 @@ export function PlayerShell() {
                 shuffle={shuffle}
               />
             </div>
+
+            {/* پنل شیشه‌ای فشرده و اسکرول‌پذیر لیریکس برای نمای بزرگ گوشی */}
+            {currentTrack.lyrics && (
+              <div className="w-full bg-white/[0.02] border border-white/5 p-4 rounded-2xl max-h-[160px] overflow-y-auto mt-2 shadow-inner">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-white/30 mb-2.5">Lyrics</p>
+                <p className="text-sm leading-relaxed text-white/80 font-medium whitespace-pre-line select-none">
+                  {currentTrack.lyrics}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
