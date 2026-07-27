@@ -8,24 +8,29 @@ import { useAuth } from "@/providers";
 import type { Track } from "@/types/domain";
 
 interface PlayerTrackSummaryProps {
+  /** Undefined renders nothing, which supports an empty player state. */
   track?: Track;
 }
 
+/** Resolves and displays the active track's related artist/album metadata. */
 export function PlayerTrackSummary({ track }: PlayerTrackSummaryProps) {
   const { currentUser } = useAuth();
 
   if (!track) {
+    // Avoid rendering a misleading placeholder when no track is selected.
     return null;
   }
 
+  // Relations are resolved from the central mock catalog by foreign key.
   const artist = artists.find((a) => a.id === track.artistId);
   const album = albums.find((a) => a.id === track.albumId);
   
+  // Gold listeners receive the extra stream-count detail.
   const isGoldUser = currentUser?.subscriptionTier === "gold";
 
   return (
     <div className="flex w-full items-center gap-3">
-      {/* هماهنگ‌سازی پس‌زمینه باکس کاور با تم بنفش */}
+      {/* Artwork uses a fixed footprint so the player controls do not shift. */}
       <div className="h-12 w-12 sm:h-14 sm:w-14 shrink-0 overflow-hidden rounded-md bg-brand-primary/40 shadow-lg border border-white/10">
         {track.coverImageUrl ? (
           <img alt={track.title} className="h-full w-full object-cover" src={track.coverImageUrl} />
@@ -36,12 +41,12 @@ export function PlayerTrackSummary({ track }: PlayerTrackSummaryProps) {
         )}
       </div>
       <div className="flex min-w-0 flex-col justify-center">
-        {/* سفید و درخشان کردن نام آهنگ */}
+        {/* Primary track title truncates in the constrained player footer. */}
         <span className="truncate text-sm font-bold text-white hover:underline cursor-pointer">
           {track.title}
         </span>
         
-        {/* روشن و شفاف کردن متون خواننده و آلبوم برای کنتراست بالاتر */}
+        {/* Resolved artist and album names link to their detail pages. */}
         <div className="flex items-center gap-1 truncate text-xs text-white/80 font-medium">
           {artist ? (
             <Link
@@ -69,7 +74,7 @@ export function PlayerTrackSummary({ track }: PlayerTrackSummaryProps) {
           )}
         </div>
         
-        {/* تغییر رنگ استریم به کرمی/هلویی اختصاصی پالت شما */}
+        {/* Premium-only stream metric is presentation, not an access boundary. */}
         {isGoldUser && (
           <span className="mt-0.5 flex items-center gap-1 text-[10px] font-bold text-yellow-400 drop-shadow-sm">
             <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24">

@@ -3,12 +3,15 @@
 import { formatDuration } from "@/lib/formatters";
 
 interface PlayerControlsProps {
+  /** Timeline values are seconds; repeat/shuffle are controlled by PlayerShell. */
   duration: number;
   progress: number;
   isPlaying: boolean;
   shuffle: boolean;
   repeat: "off" | "all" | "one";
+  /** When false, secondary controls hide on mobile but stay visible on desktop. */
   showExtraControls?: boolean;
+  /** Callbacks keep this component presentational and audio-element agnostic. */
   onPlayPause: () => void;
   onNext: () => void;
   onPrevious: () => void;
@@ -17,6 +20,11 @@ interface PlayerControlsProps {
   onRepeatToggle: () => void;
 }
 
+/**
+ * Reusable playback control strip for both desktop and expanded mobile players.
+ * Despite its historical "Placeholder" name, these controls are fully wired by
+ * PlayerShell; this component only renders state and forwards user intent.
+ */
 export function PlayerControlsPlaceholder({
   duration,
   progress,
@@ -34,7 +42,7 @@ export function PlayerControlsPlaceholder({
   return (
     <div className="flex max-w-[722px] flex-1 flex-col items-center justify-center gap-2">
       <div className="flex w-full items-center justify-between sm:w-auto sm:justify-center sm:gap-6">
-        {/* Shuffle */}
+        {/* Shuffle is visually highlighted while random queue traversal is active. */}
         <button
           className={`h-8 w-8 items-center justify-center rounded-full transition-colors ${
             showExtraControls ? "flex" : "hidden sm:flex"
@@ -47,7 +55,7 @@ export function PlayerControlsPlaceholder({
           </svg>
         </button>
 
-        {/* Previous */}
+        {/* Previous delegates restart/previous-track semantics to PlayerShell. */}
         <button
           className="flex h-8 w-8 items-center justify-center text-white/70 transition-colors hover:text-white"
           onClick={onPrevious}
@@ -57,7 +65,7 @@ export function PlayerControlsPlaceholder({
           </svg>
         </button>
 
-        {/* Play/Pause */}
+        {/* Primary play/pause action swaps icons from controlled isPlaying state. */}
         <button
           className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-brand-primary transition-transform hover:scale-105 shadow-md sm:h-10 sm:w-10"
           onClick={onPlayPause}
@@ -73,7 +81,7 @@ export function PlayerControlsPlaceholder({
           )}
         </button>
 
-        {/* Next */}
+        {/* Next delegates queue-end and repeat-all behavior to PlayerShell. */}
         <button
           className="flex h-8 w-8 items-center justify-center text-white/70 transition-colors hover:text-white"
           onClick={onNext}
@@ -83,7 +91,7 @@ export function PlayerControlsPlaceholder({
           </svg>
         </button>
 
-        {/* Repeat */}
+        {/* Repeat cycles off -> all -> one; title explains the next click action. */}
         <button
           className={`h-8 w-8 items-center justify-center rounded-full transition-colors ${
             showExtraControls ? "flex" : "hidden sm:flex"
@@ -105,7 +113,9 @@ export function PlayerControlsPlaceholder({
       </div>
 
       <div className="group hidden w-full items-center gap-2 sm:flex">
+        {/* Desktop timeline displays formatted elapsed and total duration. */}
         <span className="w-10 text-right text-xs text-white/80 font-medium">{formatDuration(progress)}</span>
+        {/* Range values arrive as strings and are converted back to seconds. */}
         <input
           className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-brand-primary/40 accent-white transition-all group-hover:accent-brand-accent"
           max={duration}

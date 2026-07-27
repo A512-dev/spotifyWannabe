@@ -6,10 +6,12 @@ interface PlaylistCardProps {
   playlist: Playlist;
 }
 
+/** Presentational playlist summary; management controls live in the page. */
 export function PlaylistCard({ playlist }: PlaylistCardProps) {
   return (
     <Card>
       {playlist.coverImageUrl ? (
+        // Artwork and fallback occupy the same square to prevent layout shifting.
         <img
           alt={`${playlist.title} cover`}
           className="aspect-square w-full rounded-md object-cover"
@@ -19,6 +21,7 @@ export function PlaylistCard({ playlist }: PlaylistCardProps) {
         <div className="aspect-square rounded-md bg-surface-700" />
       )}
       <div className="mt-3 flex items-start justify-between gap-3">
+        {/* Text may shrink/truncate while the visibility badge stays readable. */}
         <div className="min-w-0">
           <p className="truncate font-medium text-slate-50">{playlist.title}</p>
           <p className="mt-1 line-clamp-2 text-sm text-slate-400">

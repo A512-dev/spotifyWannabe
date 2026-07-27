@@ -13,32 +13,42 @@ import { formatNumber, formatDuration } from "@/lib/formatters";
 import type { Track } from "@/types/domain";
 
 export function PlayerShell() {
+  // Global context stores playback intent shared with track/album cards.
   const { playerState, setPlayerState } = usePlayer();
   const { currentUser } = useAuth();
+  // The actual browser media element is intentionally owned only by this shell.
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Resolve normalized IDs into the full records required for rendering.
   const currentTrack = tracks.find((track) => track.id === playerState.currentTrackId);
   const currentArtist = currentTrack ? artists.find((a) => a.id === currentTrack.artistId) : null;
   const currentAlbum = currentTrack ? albums.find((a) => a.id === currentTrack.albumId) : null;
 
+  // Local UI state does not need to be visible to unrelated components.
   const [activeQueue, setActiveQueue] = useState<Track[]>(tracks);
   const [isMobileExpanded, setIsMobileExpanded] = useState(false);
   const [isQueueOpen, setIsQueueOpen] = useState(false);
-  const [isLyricsOpen, setIsLyricsOpen] = useState(false); // استیت جدید برای کنترل متن آهنگ
+  const [isLyricsOpen, setIsLyricsOpen] = useState(false);
+  // progress mirrors the audio element's currentTime in whole seconds.
   const [progress, setProgress] = useState(0);
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState<"off" | "all" | "one">("off");
+  // Volume is stored as a 0–100 percentage for UI friendliness.
   const volume = playerState.volume ?? 100;
 
+  // A track selection may have placed contextual queue IDs in localStorage.
+  // Rebuild the full queue and reset track-specific UI whenever selection changes.
   useEffect(() => {
     setProgress(0);
-    setIsLyricsOpen(false); // با تغییر آهنگ، پنل متن بازنشانی شود
+    setIsLyricsOpen(false);
     const queueJson = localStorage.getItem("soundwave_active_queue");
     if (queueJson) {
       try {
+        // Ignore IDs that no longer exist in the current catalog.
         const trackIds = JSON.parse(queueJson) as string[];
         const queueTracks = trackIds.map(id => tracks.find(t => t.id === id)).filter((t): t is Track => Boolean(t));
         setActiveQueue(queueTracks.length > 0 ? queueTracks : tracks);
       } catch {
+        // Malformed queue storage falls back to the full catalog.
         setActiveQueue(tracks);
       }
     } else {
@@ -47,20 +57,26 @@ export function PlayerShell() {
   }, [playerState.currentTrackId]);
 
   const handleNext = useCallback(() => {
+    // No selected catalog record means there is nowhere to advance from.
     if (!currentTrack) return;
     let nextTrackId = currentTrack.id;
 
     if (shuffle) {
+      // Exclude the current item when possible to avoid an apparent no-op.
       const otherTracks = activeQueue.filter((t) => t.id !== currentTrack.id);
       const randomTrack = otherTracks[Math.floor(Math.random() * otherTracks.length)];
       nextTrackId = randomTrack?.id || currentTrack.id;
     } else {
+      // Normal traversal advances within the contextual queue.
       const currentIndex = activeQueue.findIndex((t) => t.id === currentTrack.id);
       if (currentIndex !== -1 && currentIndex < activeQueue.length - 1) {
         nextTrackId = activeQueue[currentIndex + 1].id;
       } else if (repeat === "all") {
+        // Repeat-all wraps from the last track to the first.
         nextTrackId = activeQueue[0].id;
       } else {
+        // At queue end without repeat, stop and reset the selected ID to the
+        // beginning so a later play action starts from a deterministic point.
         if (setPlayerState) {
           setPlayerState({ ...playerState, isPlaying: false, currentTrackId: activeQueue[0].id });
         }
@@ -78,6 +94,7 @@ export function PlayerShell() {
     if (!currentTrack || !setPlayerState) return;
     
     if (progress > 3) {
+      // Common player behavior: after three seconds, Previous restarts the track.
       setProgress(0);
       return;
     }
@@ -86,6 +103,7 @@ export function PlayerShell() {
     if (currentIndex > 0) {
       setPlayerState({ ...playerState, currentTrackId: activeQueue[currentIndex - 1].id, isPlaying: true });
     } else if (repeat === "all") {
+      // Repeat-all wraps backward from the first track to the last.
       setPlayerState({ ...playerState, currentTrackId: activeQueue[activeQueue.length - 1].id, isPlaying: true });
     } else {
       setProgress(0);
@@ -93,6 +111,7 @@ export function PlayerShell() {
   }, [currentTrack, progress, repeat, playerState, setPlayerState, activeQueue]);
 
   useEffect(() => {
+    // Changing the track source requires an explicit media reload.
     const audio = audioRef.current;
     if (!audio || !currentTrack) return;
     audio.load();
@@ -100,11 +119,13 @@ export function PlayerShell() {
   }, [currentTrack]);
 
   useEffect(() => {
+    // Synchronize declarative context state to the imperative audio API.
     const audio = audioRef.current;
     if (!audio) return;
 
     if (playerState.isPlaying) {
       void audio.play().catch(() => {
+        // Browsers may reject autoplay; reflect the real paused state in context.
         setPlayerState({ ...playerState, isPlaying: false });
       });
       return;
@@ -113,14 +134,17 @@ export function PlayerShell() {
   }, [playerState, setPlayerState]);
 
   useEffect(() => {
+    // HTMLAudioElement expects a normalized 0–1 value; clamping guards bad state.
     if (audioRef.current) {
       audioRef.current.volume = Math.min(Math.max(volume / 100, 0), 1);
     }
   }, [volume]);
 
+  // Unknown/missing IDs suppress the player rather than dereferencing undefined.
   if (!currentTrack) return null;
 
   const togglePlayPause = () => {
+    // The synchronization effect above performs the actual audio play/pause call.
     if (setPlayerState) {
       setPlayerState({ ...playerState, isPlaying: !playerState.isPlaying });
     }
@@ -133,6 +157,7 @@ export function PlayerShell() {
   };
 
   const handleSeek = (time: number) => {
+    // Update both the media element and React display state immediately.
     if (audioRef.current) {
       audioRef.current.currentTime = time;
     }
@@ -141,6 +166,7 @@ export function PlayerShell() {
 
   const handleAudioEnded = () => {
     if (repeat === "one" && audioRef.current) {
+      // Repeat-one bypasses queue traversal and restarts the same media element.
       audioRef.current.currentTime = 0;
       void audioRef.current.play();
       return;
@@ -149,17 +175,21 @@ export function PlayerShell() {
   };
 
   const toggleRepeat = () => {
+    // Cycle through the three supported modes in a predictable order.
     if (repeat === "off") setRepeat("all");
     else if (repeat === "all") setRepeat("one");
     else setRepeat("off");
   };
 
+  // Queue preview shows at most the next five items after the current track.
   const currentIdx = activeQueue.findIndex(t => t.id === currentTrack.id);
   const upcomingTracks = activeQueue.slice(currentIdx + 1, currentIdx + 6); 
+  // Gold controls only the extra stream metric in PlayerTrackSummary.
   const isGoldUser = currentUser?.subscriptionTier === "gold";
 
   return (
     <>
+      {/* Hidden media element emits end/time events that drive React UI state. */}
       <audio
         onEnded={handleAudioEnded}
         onTimeUpdate={(event) => setProgress(Math.floor(event.currentTarget.currentTime))}
@@ -167,12 +197,12 @@ export function PlayerShell() {
         src={currentTrack.audioUrl}
       />
       
-      {/* نوار پایین ثابت */}
+      {/* Fixed desktop/mobile-mini player; mobile navigation occupies 70px below. */}
       <footer className="fixed bottom-[70px] md:bottom-0 left-0 right-0 z-40 border-t border-white/5 bg-white/[0.04] px-4 py-3.5 backdrop-blur-xl shadow-[0_-4px_24px_rgba(0,0,0,0.4)] text-white transition-all duration-300">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4 relative">
           
           <div className="flex items-center justify-between w-full sm:w-[30%] gap-4">
-            {/* اطلاعات آهنگ */}
+            {/* Track summary expands the mobile player when the row is tapped. */}
             <div 
               className="flex min-w-0 flex-1 cursor-pointer"
               onClick={() => setIsMobileExpanded(true)}
@@ -180,7 +210,7 @@ export function PlayerShell() {
               <PlayerTrackSummary track={currentTrack} />
             </div>
 
-            {/* کنترلرهای ساده مینی‌پلیر موبایل */}
+            {/* Mobile mini-player exposes only the two most important actions. */}
             <div className="flex items-center gap-2 sm:hidden shrink-0">
               <button onClick={togglePlayPause} className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#1a0b2e] shadow hover:scale-105 transition-transform">
                 {playerState.isPlaying ? (
@@ -195,7 +225,7 @@ export function PlayerShell() {
             </div>
           </div>
 
-          {/* کنترلرهای دسکتاپ */}
+          {/* Desktop center region contains full controls and progress timeline. */}
           <div className="hidden sm:flex flex-1 items-center justify-center gap-4 px-4">
             <PlayerControlsPlaceholder 
               duration={currentTrack.durationSeconds}
@@ -213,11 +243,12 @@ export function PlayerShell() {
           </div>
 
           <div className="hidden w-[30%] items-center justify-end gap-3.5 sm:flex relative">
-            {/* دکمه اختصاصی شیشه‌ای متن آهنگ - فقط در صورت وجود کلمات رندر می‌شود */}
+            {/* Lyrics action exists only when the current track has lyric text. */}
             {currentTrack.lyrics && (
               <button 
                 className={`transition-all p-1 rounded-md hover:bg-white/5 ${isLyricsOpen ? 'text-brand-secondary scale-105' : 'text-white/60 hover:text-white'}`}
                 onClick={() => {
+                  // Lyrics and queue popovers are mutually exclusive.
                   setIsLyricsOpen(!isLyricsOpen);
                   if (isQueueOpen) setIsQueueOpen(false);
                 }}
@@ -229,6 +260,7 @@ export function PlayerShell() {
               </button>
             )}
 
+            {/* Queue action also closes lyrics to prevent overlapping popovers. */}
             <button 
               className={`transition-colors p-1 rounded-md hover:bg-white/5 ${isQueueOpen ? 'text-brand-secondary' : 'text-white/60 hover:text-white'}`}
               onClick={() => {
@@ -252,7 +284,7 @@ export function PlayerShell() {
               />
             </div>
 
-            {/* پاپ‌آپ شیشه‌ای نمایش متن آهنگ */}
+            {/* Desktop lyrics popover preserves line breaks and scrolls long text. */}
             {isLyricsOpen && currentTrack.lyrics && (
               <div className="absolute bottom-[calc(100%+1.5rem)] right-0 w-80 max-h-[350px] rounded-xl border border-white/10 bg-[#160926]/95 p-4.5 shadow-2xl backdrop-blur-xl text-white flex flex-col gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
                 <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest border-b border-white/5 pb-2">Lyrics</h3>
@@ -262,12 +294,13 @@ export function PlayerShell() {
               </div>
             )}
 
-            {/* پاپ‌آپ صف پخش */}
+            {/* Desktop queue popover lets a listener jump to an upcoming track. */}
             {isQueueOpen && (
               <div className="absolute bottom-[calc(100%+1rem)] right-0 w-80 rounded-xl border border-white/10 bg-[#1a0b2e]/95 p-4 shadow-2xl backdrop-blur-xl text-white">
                 <h3 className="mb-4 text-xs font-bold text-white/50 uppercase tracking-wider">Next In Queue</h3>
                 <div className="flex flex-col gap-2">
                   {upcomingTracks.length > 0 ? upcomingTracks.map(t => {
+                    // Resolve each preview's artist without storing duplicate data.
                     const tArtist = artists.find(a => a.id === t.artistId);
                     return (
                       <div className="flex items-center gap-3 cursor-pointer hover:bg-white/10 p-2 rounded-lg transition-colors" key={t.id} onClick={() => setPlayerState?.({ ...playerState, currentTrackId: t.id, isPlaying: true })}>
@@ -288,7 +321,7 @@ export function PlayerShell() {
         </div>
       </footer>
 
-      {/* پلیر تمام‌صفحه اختصاصی موبایل */}
+      {/* Tapping the mini summary opens this full-screen mobile player. */}
       {isMobileExpanded && (
         <div className="fixed inset-0 z-50 flex flex-col bg-[#160926]/95 p-6 backdrop-blur-3xl sm:hidden text-white overflow-y-auto">
           <div className="mb-6 flex items-center justify-between shrink-0">
@@ -302,6 +335,7 @@ export function PlayerShell() {
           </div>
 
           <div className="flex flex-1 flex-col justify-center gap-6 max-w-sm mx-auto w-full pb-8">
+            {/* Large artwork and metadata optimize the primary mobile task. */}
             <div className="aspect-square w-full overflow-hidden rounded-3xl bg-white/5 shadow-2xl border border-white/10 shrink-0">
               {currentTrack.coverImageUrl ? (
                 <img alt={currentTrack.title} className="h-full w-full object-cover" src={currentTrack.coverImageUrl} />
@@ -328,6 +362,7 @@ export function PlayerShell() {
             </div>
 
             <div className="w-full flex flex-col gap-5 mt-1 shrink-0">
+              {/* Mobile owns a separate always-visible timeline. */}
               <div className="flex w-full items-center gap-3">
                 <span className="w-10 text-right text-xs text-white/60 font-semibold">{formatDuration(progress)}</span>
                 <input
@@ -356,7 +391,7 @@ export function PlayerShell() {
               />
             </div>
 
-            {/* پنل شیشه‌ای فشرده و اسکرول‌پذیر لیریکس برای نمای بزرگ گوشی */}
+            {/* Mobile lyrics are inline, compact, and independently scrollable. */}
             {currentTrack.lyrics && (
               <div className="w-full bg-white/[0.02] border border-white/5 p-4 rounded-2xl max-h-[160px] overflow-y-auto mt-2 shadow-inner">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-white/30 mb-2.5">Lyrics</p>

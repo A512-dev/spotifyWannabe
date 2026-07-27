@@ -13,10 +13,12 @@ interface NotificationCardProps {
 }
 
 export function NotificationCard({ notification, onDelete, onMarkRead }: NotificationCardProps) {
+  // readAt doubles as both an audit timestamp and the read/unread flag.
   const isUnread = !notification.readAt;
 
   return (
     <Card className={cn("transition", isUnread && "border-sky-500/50 bg-sky-500/10")}>
+      {/* Header combines unread emphasis, category, and current read state. */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 gap-3">
           {isUnread ? <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-sky-400" /> : null}
@@ -33,6 +35,7 @@ export function NotificationCard({ notification, onDelete, onMarkRead }: Notific
         </Badge>
       </div>
       <p className="mt-3 text-xs text-slate-500">{formatDate(notification.createdAt)}</p>
+      {/* Actions are capability-based: omitted callbacks produce no button. */}
       <div className="mt-4 flex flex-wrap gap-2">
         {notification.actionHref ? (
           <Link

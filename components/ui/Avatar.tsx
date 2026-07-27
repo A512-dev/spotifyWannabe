@@ -7,6 +7,7 @@ interface AvatarProps {
 }
 
 export function Avatar({ className, name, src }: AvatarProps) {
+  // Convert up to the first two space-separated name parts into fallback initials.
   const initials = name
     .split(" ")
     .map((part) => part[0])
@@ -15,6 +16,7 @@ export function Avatar({ className, name, src }: AvatarProps) {
     .toUpperCase();
 
   if (src) {
+    // A supplied image wins; object-cover avoids distortion in the circular crop.
     return (
       <img
         alt={`${name} avatar`}
@@ -25,6 +27,7 @@ export function Avatar({ className, name, src }: AvatarProps) {
   }
 
   return (
+    // Text fallback remains accessible through an explicit label.
     <span
       aria-label={`${name} avatar`}
       className={cn(

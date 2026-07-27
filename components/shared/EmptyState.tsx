@@ -4,9 +4,11 @@ import { Card } from "@/components/ui/Card";
 interface EmptyStateProps {
   title: string;
   description: string;
+  /** Optional caller-owned CTA such as "Create first playlist". */
   action?: ReactNode;
 }
 
+/** Consistent explanation and recovery action for lists with no content. */
 export function EmptyState({ action, description, title }: EmptyStateProps) {
   return (
     <Card className="flex flex-col items-start gap-3">
@@ -16,4 +18,3 @@ export function EmptyState({ action, description, title }: EmptyStateProps) {
     </Card>
   );
 }
-

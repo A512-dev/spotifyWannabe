@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
+// Badge tones communicate status without requiring each feature to choose colors.
 type BadgeTone = "neutral" | "success" | "warning" | "danger" | "info";
 
 interface BadgeProps {
@@ -17,6 +18,7 @@ const toneClasses: Record<BadgeTone, string> = {
   info: "bg-sky-500/15 text-sky-200"
 };
 
+/** Compact, non-interactive status/category label. */
 export function Badge({ children, className, tone = "neutral" }: BadgeProps) {
   return (
     <span className={cn("inline-flex rounded-full px-2.5 py-1 text-xs font-medium", toneClasses[tone], className)}>
@@ -24,4 +26,3 @@ export function Badge({ children, className, tone = "neutral" }: BadgeProps) {
     </span>
   );
 }
-

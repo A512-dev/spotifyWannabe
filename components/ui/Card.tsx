@@ -5,6 +5,10 @@ interface CardProps extends HTMLAttributes<HTMLDivElement> {
   children: ReactNode;
 }
 
+/**
+ * Neutral raised surface used as the visual base for product-level cards.
+ * Native div attributes are forwarded so callers can attach handlers/ARIA data.
+ */
 export function Card({ children, className, ...props }: CardProps) {
   return (
     <div
@@ -15,4 +19,3 @@ export function Card({ children, className, ...props }: CardProps) {
     </div>
   );
 }
-

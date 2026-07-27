@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 
 interface ConfirmDialogProps {
+  /** Copy and callbacks are supplied by the destructive action's owner. */
   open: boolean;
   title: string;
   description: string;
@@ -13,6 +14,7 @@ interface ConfirmDialogProps {
   onConfirm: () => void;
 }
 
+/** Standard two-action confirmation built on the shared Modal primitive. */
 export function ConfirmDialog({
   cancelLabel = "Cancel",
   confirmLabel = "Confirm",
@@ -25,6 +27,7 @@ export function ConfirmDialog({
   return (
     <Modal onClose={onCancel} open={open} title={title}>
       <p className="text-sm text-slate-300">{description}</p>
+      {/* Cancel is visually quiet; confirm is red to signal destructive intent. */}
       <div className="mt-5 flex justify-end gap-2">
         <Button onClick={onCancel} variant="ghost">
           {cancelLabel}
@@ -36,4 +39,3 @@ export function ConfirmDialog({
     </Modal>
   );
 }
-

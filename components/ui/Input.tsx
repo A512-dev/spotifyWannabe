@@ -2,16 +2,19 @@ import type { InputHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+  /** Optional visible label and explanatory text wrap the native input. */
   label?: string;
   helperText?: string;
 }
 
 export function Input({ className, helperText, label, id, ...props }: InputProps) {
+  // Name is a useful stable label target when an explicit id is not supplied.
   const inputId = id ?? props.name;
 
   return (
     <label className="block text-sm text-slate-200" htmlFor={inputId}>
       {label ? <span className="mb-2 block font-medium">{label}</span> : null}
+      {/* Native input props are forwarded, preserving validation and autocomplete. */}
       <input
         id={inputId}
         className={cn(
@@ -24,4 +27,3 @@ export function Input({ className, helperText, label, id, ...props }: InputProps
     </label>
   );
 }
-

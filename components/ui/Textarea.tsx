@@ -2,6 +2,7 @@ import type { TextareaHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
+  /** Matches Input's label/helper API for consistent forms. */
   label?: string;
   helperText?: string;
 }
@@ -14,11 +15,13 @@ export function Textarea({
   rows = 4,
   ...props
 }: TextareaProps) {
+  // Name doubles as a label target if the caller omits id.
   const textareaId = id ?? props.name;
 
   return (
     <label className="block text-sm text-slate-200" htmlFor={textareaId}>
       {label ? <span className="mb-2 block font-medium">{label}</span> : null}
+      {/* Four rows provides a useful default while remaining caller-overridable. */}
       <textarea
         id={textareaId}
         rows={rows}
@@ -32,4 +35,3 @@ export function Textarea({
     </label>
   );
 }
-

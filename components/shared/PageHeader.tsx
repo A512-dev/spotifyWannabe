@@ -3,9 +3,11 @@ import type { ReactNode } from "react";
 interface PageHeaderProps {
   title: string;
   description?: string;
+  /** Optional page-owned buttons/links rendered opposite the heading. */
   actions?: ReactNode;
 }
 
+/** Shared responsive page title, description, and action region. */
 export function PageHeader({ actions, description, title }: PageHeaderProps) {
   return (
     <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -17,4 +19,3 @@ export function PageHeader({ actions, description, title }: PageHeaderProps) {
     </div>
   );
 }
-

@@ -3,9 +3,11 @@ import { MainAppLayout } from "@/components/layout/MainAppLayout";
 
 interface DashboardLayoutProps {
   children: ReactNode;
+  /** Small context label such as "Admin workspace" above the page content. */
   eyebrow: string;
 }
 
+/** Main authenticated shell plus a consistent operational-dashboard eyebrow. */
 export function DashboardLayout({ children, eyebrow }: DashboardLayoutProps) {
   return (
     <MainAppLayout>
@@ -14,4 +16,3 @@ export function DashboardLayout({ children, eyebrow }: DashboardLayoutProps) {
     </MainAppLayout>
   );
 }
-

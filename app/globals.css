@@ -1,27 +1,33 @@
+/* Expand Tailwind's reset, component layer, and generated utilities. */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  color-scheme: dark; /* تغییر به حالت دارک برای هماهنگی با بنفش تیره */
+  /* Tell native form controls and browser UI that this application is dark. */
+  color-scheme: dark;
 }
 
+/* Keep declared dimensions predictable when padding and borders are added. */
 * {
   box-sizing: border-box;
 }
 
 html,
 body {
+  /* Allow every route shell to fill at least the viewport height. */
   min-height: 100%;
 }
 
 body {
+  /* Global fallback matches the branded shell before Tailwind styles load. */
   margin: 0;
-  background: #1a0b2e; /* بنفش تیره عمیق */
-  color: #f8fafc;    /* متن‌های پیش‌فرض سفید/روشن شوند تا کاملاً خوانا باشند */
+  background: #1a0b2e;
+  color: #f8fafc;
 }
 
 a {
+  /* Links inherit component styling instead of browser defaults. */
   color: inherit;
   text-decoration: none;
 }
@@ -30,5 +36,6 @@ button,
 input,
 textarea,
 select {
+  /* Form controls use the surrounding application typography. */
   font: inherit;
 }

@@ -12,17 +12,20 @@ import { getPostLoginPath } from "@/lib/auth";
 import { useAuth } from "@/providers/AuthProvider";
 
 export function MainAppLayout({ children }: { children: ReactNode }) {
+  // Pathname supports both redirect-back behavior and prefix-based access checks.
   const pathname = usePathname();
   const router = useRouter();
   const { currentUser, isAuthReady } = useAuth();
 
+  // Once persisted auth has hydrated, send signed-out visitors to login and keep
+  // their intended internal path in a query parameter for a post-login return.
   useEffect(() => {
     if (isAuthReady && !currentUser) {
       router.replace(`/login?next=${encodeURIComponent(pathname)}`);
     }
   }, [currentUser, isAuthReady, pathname, router]);
 
-  // ۱. حالت بارگذاری با پس‌زمینه لایت و متن بنفش تیره
+  // Do not make authorization decisions until localStorage hydration finishes.
   if (!isAuthReady) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-surface-light px-4 text-brand-primary">
@@ -32,6 +35,8 @@ export function MainAppLayout({ children }: { children: ReactNode }) {
   }
 
   if (!currentUser) {
+    // The effect performs the redirect; this stable screen avoids flashing
+    // protected content while navigation is in progress.
     return (
       <main className="flex min-h-screen items-center justify-center bg-surface-light px-4">
         <section className="w-full max-w-md rounded-lg border border-brand-secondary/30 bg-white p-6 text-center shadow-md">
@@ -46,6 +51,8 @@ export function MainAppLayout({ children }: { children: ReactNode }) {
   }
 
   if (!canAccessRoute(currentUser, pathname)) {
+    // Client-side role guard provides a friendly recovery destination. A real
+    // security boundary must repeat this authorization on the server/API.
     return (
       <main className="flex min-h-screen items-center justify-center bg-surface-light px-4">
         <section className="w-full max-w-md rounded-lg border border-brand-secondary/30 bg-white p-6 text-center shadow-md">
@@ -60,11 +67,13 @@ export function MainAppLayout({ children }: { children: ReactNode }) {
   }
 
   return (
+  // Authenticated, authorized shell: sidebar + top bar + persistent player.
   <div className="min-h-screen bg-brand-bgDark text-white"> 
     <div className="flex min-h-screen pb-24">
       <Sidebar />
       <div className="min-w-0 flex-1">
         <Topbar />
+        {/* max-w-7xl keeps very wide dashboards readable while remaining fluid. */}
         <main className="mx-auto w-full max-w-7xl px-4 py-6">{children}</main>
       </div>
     </div>

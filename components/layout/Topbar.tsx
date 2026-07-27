@@ -13,23 +13,28 @@ import { useAuth } from "@/providers/AuthProvider";
 export function Topbar() {
   const router = useRouter();
   const { currentUser, logout } = useAuth();
+  // MainAppLayout normally guarantees a user; this defensive guard prevents
+  // property reads during a session transition.
   if (!currentUser) {
     return null;
   }
 
+  // Account links are role-filtered using the same helper as the sidebar.
   const accountLinks = filterNavigationForUser(ACCOUNT_NAVIGATION, currentUser);
   const handleLogout = () => {
+    // Clear the persisted session before navigating to the public login page.
     logout();
     router.push("/login");
   };
 
+  // Gold receives a distinct animated subscription badge.
   const isGold = currentUser.subscriptionTier === "gold";
 
   return (
     <header className="sticky top-0 z-20 border-b border-white/[0.06] bg-[#1a0b2e]/60 px-6 py-3.5 backdrop-blur-xl shadow-[0_4px_30px_rgba(0,0,0,0.2)]">
       <div className="flex items-center justify-between gap-4">
         
-        {/* بخش چپ: اطلاعات اکانت با چراغ سیگنال آنلاین */}
+        {/* Left: active-session indicator and signed-in display name. */}
         <div className="flex items-center gap-3 min-w-0">
           <div className="relative flex h-2 w-2 shrink-0">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -43,10 +48,10 @@ export function Topbar() {
           </div>
         </div>
 
-        {/* بخش راست: ناوبری، بج‌ها و پروفایل */}
+        {/* Right: account metadata, secondary navigation, and session controls. */}
         <div className="flex items-center gap-5">
           
-          {/* کپسول‌های مدرن نقش و سابسکریپشن */}
+          {/* Role and subscription badges collapse on very narrow screens. */}
           <div className="hidden gap-2.5 sm:flex items-center">
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase bg-white/10 text-white/80 border border-white/5">
               {getRoleLabel(currentUser.role)}
@@ -60,7 +65,7 @@ export function Topbar() {
             </span>
           </div>
 
-          {/* کپسول شیشه‌ای و یک‌پارچه برای لینک‌های حساب کاربری (Settings, Profile, ...) */}
+          {/* Desktop account links share a compact pill-shaped navigation group. */}
           <nav className="hidden items-center bg-white/[0.03] border border-white/[0.05] rounded-full p-1 text-xs font-bold text-white/70 lg:flex shadow-inner">
             {accountLinks.map((item) => (
               <Link 
@@ -73,10 +78,10 @@ export function Topbar() {
             ))}
           </nav>
 
-          {/* line جداکننده ظریف */}
+          {/* Subtle divider separates navigation from the user controls. */}
           <span className="hidden lg:block h-4 w-[1px] bg-white/10"></span>
 
-          {/* بخش آواتار و دکمه خروج */}
+          {/* Avatar and logout remain available even when account links collapse. */}
           <div className="flex items-center gap-3 shrink-0">
             <div className="p-0.5 rounded-full bg-gradient-to-b from-white/20 to-transparent shadow-md">
               <Avatar name={currentUser.displayName} src={currentUser.avatarUrl} />

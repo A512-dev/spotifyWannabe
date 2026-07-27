@@ -6,6 +6,7 @@ interface StatCardProps {
   helperText?: string;
 }
 
+/** Small metric tile shared by profile and operational dashboards. */
 export function StatCard({ helperText, label, value }: StatCardProps) {
   return (
     <Card>
@@ -15,4 +16,3 @@ export function StatCard({ helperText, label, value }: StatCardProps) {
     </Card>
   );
 }
-

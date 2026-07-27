@@ -1,15 +1,18 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
+// Variants encode semantic intent; sizes encode consistent control dimensions.
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 type ButtonSize = "sm" | "md" | "lg";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  /** Visible button content; native attributes such as disabled remain supported. */
   children: ReactNode;
   variant?: ButtonVariant;
   size?: ButtonSize;
 }
 
+// Keeping class maps outside the component avoids rebuilding them on each render.
 const variantClasses: Record<ButtonVariant, string> = {
   primary: "bg-brand-500 text-surface-900 hover:bg-brand-600",
   secondary: "bg-surface-700 text-slate-50 hover:bg-surface-600",
@@ -31,10 +34,14 @@ export function Button({
   type = "button",
   ...props
 }: ButtonProps) {
+  // Defaulting to type="button" prevents accidental form submission. Callers
+  // must opt into type="submit" for intentional form actions.
   return (
     <button
       className={cn(
+        // Base classes define shared shape, behavior, and disabled affordances.
         "inline-flex items-center justify-center rounded-md font-medium transition disabled:cursor-not-allowed disabled:opacity-50",
+        // Semantic variant, dimension, then caller overrides are composed in order.
         variantClasses[variant],
         sizeClasses[size],
         className
@@ -46,4 +53,3 @@ export function Button({
     </button>
   );
 }
-

@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 
 interface ModalProps {
+  /** Closed modals are removed from the DOM instead of merely hidden. */
   open: boolean;
   title: string;
   children: ReactNode;
@@ -11,11 +12,13 @@ interface ModalProps {
 }
 
 export function Modal({ children, onClose, open, title }: ModalProps) {
+  // Early return prevents hidden content from remaining keyboard-focusable.
   if (!open) {
     return null;
   }
 
   return (
+    // Full-screen backdrop centers one constrained dialog-like surface.
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
       <section className="w-full max-w-lg rounded-lg border border-surface-600 bg-surface-800 p-5 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
@@ -29,4 +32,3 @@ export function Modal({ children, onClose, open, title }: ModalProps) {
     </div>
   );
 }
-

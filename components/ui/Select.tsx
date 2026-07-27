@@ -2,6 +2,7 @@ import type { SelectHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 export interface SelectOption {
+  /** Display copy and submitted machine value remain deliberately separate. */
   label: string;
   value: string;
 }
@@ -13,6 +14,7 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 }
 
 export function Select({ className, helperText, label, id, options, ...props }: SelectProps) {
+  // Mirror Input's id/name fallback for consistent label behavior.
   const selectId = id ?? props.name;
 
   return (
@@ -27,6 +29,7 @@ export function Select({ className, helperText, label, id, options, ...props }: 
         {...props}
       >
         {options.map((option) => (
+          // Option value is stable and therefore also serves as the React key.
           <option key={option.value} value={option.value}>
             {option.label}
           </option>
@@ -36,4 +39,3 @@ export function Select({ className, helperText, label, id, options, ...props }: 
     </label>
   );
 }
-
