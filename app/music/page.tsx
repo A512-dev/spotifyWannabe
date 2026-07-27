@@ -14,6 +14,7 @@ import { useAuth } from "@/providers";
 import type { Track } from "@/types/domain";
 
 function getArtistName(artistId: string) {
+  // Catalog records remain normalized; resolve a display name on demand.
   return artists.find((artist) => artist.id === artistId)?.stageName ?? "Unknown artist";
 }
 
@@ -24,9 +25,11 @@ function MusicPageContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("newest");
   const [message, setMessage] = useState("");
+  // addToPlaylist switches TrackCard from playback mode to selection mode.
   const targetPlaylistId = searchParams.get("addToPlaylist");
 
   const filteredAlbums = useMemo(() => {
+    // Search matches either release title or resolved artist name.
     return albums
       .filter((album) => {
         const artistName = getArtistName(album.artistId);
@@ -34,6 +37,7 @@ function MusicPageContent() {
         return album.title.toLowerCase().includes(query) || artistName.toLowerCase().includes(query);
       })
       .sort((first, second) => {
+        // Album list supports date ordering; most-played has no album equivalent.
         if (sortBy === "newest") {
           return new Date(second.releaseDate).getTime() - new Date(first.releaseDate).getTime();
         }
@@ -47,6 +51,7 @@ function MusicPageContent() {
   }, [searchQuery, sortBy]);
 
   const filteredTracks = useMemo(() => {
+    // Track results share the query but add play-count sorting.
     return tracks
       .filter((track) => {
         const artistName = getArtistName(track.artistId);
@@ -71,10 +76,12 @@ function MusicPageContent() {
   }, [searchQuery, sortBy]);
 
   const handleAddTrackToPlaylist = (track: Track) => {
+    // Ignore selection unless both auth and target query context are present.
     if (!currentUser || !targetPlaylistId) {
       return;
     }
 
+    // Read the latest browser value to avoid overwriting edits from playlists.
     const fallbackPlaylists = defaultPlaylists.filter((playlist) => playlist.ownerId === currentUser.id);
     const storedPlaylists = readStoredPlaylists(currentUser.id, fallbackPlaylists);
     let playlistFound = false;
@@ -87,11 +94,13 @@ function MusicPageContent() {
       playlistFound = true;
 
       if (playlist.itemIds.includes(track.id)) {
+        // Keep state unchanged and report the duplicate after the scan.
         trackAlreadyAdded = true;
         return playlist;
       }
 
       return {
+        // Append preserves the playlist's playback order.
         ...playlist,
         itemIds: [...playlist.itemIds, track.id],
         updatedAt: new Date().toISOString()
@@ -110,6 +119,7 @@ function MusicPageContent() {
       return;
     }
 
+    // Successful addition returns the user to playlist management.
     router.push("/playlists");
   };
 
@@ -127,6 +137,7 @@ function MusicPageContent() {
       {message ? <p className="mt-4 text-sm text-yellow-200">{message}</p> : null}
 
       <div className="mt-6 flex flex-col gap-4 sm:flex-row">
+        {/* Search and sort controls drive both memoized result collections. */}
         <div className="flex-1">
           <input
             className="w-full rounded-md border border-slate-700 bg-slate-800/50 px-4 py-2 text-sm text-slate-50 focus:border-white focus:outline-none"
@@ -150,6 +161,7 @@ function MusicPageContent() {
       </div>
 
       <section className="mt-8">
+        {/* Album cards always navigate; add-to-playlist mode applies to tracks only. */}
         <h2 className="mb-4 text-xl font-bold text-slate-50">Albums</h2>
         {filteredAlbums.length > 0 ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -165,6 +177,7 @@ function MusicPageContent() {
       </section>
 
       <section className="mt-8">
+        {/* onSelect overrides TrackCard playback only in playlist-selection mode. */}
         <h2 className="mb-4 text-xl font-bold text-slate-50">Tracks</h2>
         {filteredTracks.length > 0 ? (
           <div className="grid gap-3 lg:grid-cols-2">
@@ -186,6 +199,7 @@ function MusicPageContent() {
 }
 
 export default function MusicPage() {
+  // Next search-parameter reading is isolated under Suspense.
   return (
     <Suspense fallback={<MainAppLayout>Loading music...</MainAppLayout>}>
       <MusicPageContent />

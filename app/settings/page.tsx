@@ -12,16 +12,19 @@ import { getSubscriptionLabel } from "@/lib/labels";
 import { canEditProfileImage } from "@/lib/subscription";
 import { useAuth } from "@/providers";
 
+// Small unions constrain the exact values persisted by each preferences select.
 type NotificationLimit = "all" | "important_only" | "muted";
 type SystemSound = "default" | "soft" | "off";
 type LanguagePreference = "en" | "fa";
 
+/** Per-user browser preferences; these do not yet alter app-wide behavior. */
 interface UserSettingsPreferences {
   language: LanguagePreference;
   notificationLimit: NotificationLimit;
   systemSound: SystemSound;
 }
 
+// New accounts and corrupt/missing storage start from these predictable values.
 const defaultPreferences: UserSettingsPreferences = {
   language: "en",
   notificationLimit: "all",
@@ -29,6 +32,7 @@ const defaultPreferences: UserSettingsPreferences = {
 };
 
 function getPreferencesKey(userId: string) {
+  // Per-user namespacing prevents preferences leaking between demo logins.
   return `soundwave.preferences.${userId}`;
 }
 
@@ -40,11 +44,13 @@ function readPreferences(userId: string): UserSettingsPreferences {
   }
 
   try {
+    // Merge partial older values over current defaults for forward compatibility.
     return {
       ...defaultPreferences,
       ...(JSON.parse(storedValue) as Partial<UserSettingsPreferences>)
     };
   } catch {
+    // Malformed local JSON falls back instead of breaking the settings route.
     return defaultPreferences;
   }
 }
@@ -58,6 +64,7 @@ export default function SettingsPage() {
   const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
+    // Storage is browser-only, so load after the authenticated user hydrates.
     if (!currentUser) {
       return;
     }
@@ -69,9 +76,11 @@ export default function SettingsPage() {
     return <MainAppLayout>Loading settings...</MainAppLayout>;
   }
 
+  // Pricing is display-only on this page; plan changes/payment are Phase 2 work.
   const subscriptionPrice = subscriptionPrices.find((item) => item.tier === currentUser.subscriptionTier);
 
   const handleSave = (event: FormEvent<HTMLFormElement>) => {
+    // Persist the entire small preference object under the current account.
     event.preventDefault();
     window.localStorage.setItem(getPreferencesKey(currentUser.id), JSON.stringify(preferences));
     setError("");
@@ -79,6 +88,7 @@ export default function SettingsPage() {
   };
 
   const handleDeleteAccount = () => {
+    // AuthProvider removes profile, credential, and session; this page handles UI.
     const result = deleteCurrentUser();
 
     if (!result.ok) {
@@ -87,6 +97,7 @@ export default function SettingsPage() {
       return;
     }
 
+    // Replace prevents navigating "back" into a deleted authenticated session.
     router.replace("/signup");
   };
 
@@ -97,6 +108,7 @@ export default function SettingsPage() {
         title="Settings"
       />
       <section className="mt-6 grid gap-4 lg:grid-cols-2">
+        {/* Preferences are local-only; subscription information is derived data. */}
         <Card>
           <h2 className="text-lg font-semibold text-slate-50">Preferences</h2>
           <form className="mt-4 space-y-4" onSubmit={handleSave}>
@@ -176,6 +188,7 @@ export default function SettingsPage() {
         </Card>
 
         <Card className="lg:col-span-2">
+          {/* Destructive account removal requires explicit modal confirmation. */}
           <h2 className="text-lg font-semibold text-slate-50">Delete account</h2>
           <p className="mt-3 max-w-2xl text-sm text-slate-400">
             This removes the current mock user and signs you out of this browser session.

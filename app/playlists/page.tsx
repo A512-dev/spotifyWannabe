@@ -15,15 +15,18 @@ import { useAuth } from "@/providers";
 import type { Playlist } from "@/types/domain";
 
 function createPlaylistId() {
+  // Browser-local ID only needs practical uniqueness within one mock session.
   return `playlist-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function getArtistName(artistId: string) {
+  // Resolve normalized catalog relation for each rendered track.
   return artists.find((artist) => artist.id === artistId)?.stageName ?? "Unknown artist";
 }
 
 export default function PlaylistsPage() {
   const { currentUser } = useAuth();
+  // One modal serves create and rename modes; these fields describe its state.
   const [localPlaylists, setLocalPlaylists] = useState<Playlist[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
@@ -32,6 +35,7 @@ export default function PlaylistsPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    // Seed only this user's playlists, then prefer any per-user browser edits.
     if (!currentUser) {
       return;
     }
@@ -44,19 +48,23 @@ export default function PlaylistsPage() {
     return <MainAppLayout><div className="text-white">Loading playlists...</div></MainAppLayout>;
   }
 
+  // Infinity for Gold works naturally in all numeric comparisons below.
   const playlistLimit = getPlaylistLimit(currentUser.subscriptionTier);
 
   const savePlaylists = (nextPlaylists: Playlist[]) => {
+    // Keep rendered state and browser persistence synchronized through one helper.
     setLocalPlaylists(nextPlaylists);
     writeStoredPlaylists(currentUser.id, nextPlaylists);
   };
 
   const handleOpenCreate = () => {
+    // Enforce the subscription rule before opening an unusable form.
     if (localPlaylists.length >= playlistLimit) {
       setError(`You have reached the maximum number of playlists allowed (${playlistLimit}).`);
       return;
     }
 
+    // Reset any edit-mode residue before presenting a blank creation form.
     setError("");
     setCurrentPlaylistId(null);
     setTitleInput("");
@@ -65,6 +73,7 @@ export default function PlaylistsPage() {
   };
 
   const handleOpenEdit = (playlist: Playlist) => {
+    // Prepopulate the shared modal with the selected playlist's identity.
     setError("");
     setCurrentPlaylistId(playlist.id);
     setTitleInput(playlist.title);
@@ -82,12 +91,14 @@ export default function PlaylistsPage() {
     }
 
     if (modalMode === "create") {
+      // Recheck at submit time in case state changed while the modal was open.
       if (localPlaylists.length >= playlistLimit) {
         setError(`You have reached the maximum number of playlists allowed (${playlistLimit}).`);
         return;
       }
 
       const now = new Date().toISOString();
+      // New playlists begin private and empty with matching audit timestamps.
       const nextPlaylist: Playlist = {
         id: createPlaylistId(),
         ownerId: currentUser.id,
@@ -101,6 +112,7 @@ export default function PlaylistsPage() {
 
       savePlaylists([...localPlaylists, nextPlaylist]);
     } else if (currentPlaylistId) {
+      // Rename only the selected record and refresh its update timestamp.
       savePlaylists(
         localPlaylists.map((playlist) =>
           playlist.id === currentPlaylistId
@@ -115,6 +127,7 @@ export default function PlaylistsPage() {
   };
 
   const handleDelete = (playlistId: string) => {
+    // Phase 1 deletes immediately; no confirmation dialog is used here.
     savePlaylists(localPlaylists.filter((playlist) => playlist.id !== playlistId));
   };
 
@@ -131,6 +144,7 @@ export default function PlaylistsPage() {
       />
 
       <div className="mt-4 flex flex-wrap gap-2.5 items-center">
+        {/* Compact counters expose current usage against the plan allowance. */}
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/[0.04] border border-white/10 text-white/90 shadow-sm">
           <span className="h-1.5 w-1.5 rounded-full bg-brand-secondary animate-pulse"></span>
           Your playlists: <strong className="text-white ml-0.5">{localPlaylists.length}</strong>
@@ -144,6 +158,7 @@ export default function PlaylistsPage() {
 
       <section className="mt-8">
         {localPlaylists.length === 0 ? (
+          /* Empty state gives the same create action as the page header. */
           <div className="rounded-xl border border-white/5 bg-white/[0.02] p-8 shadow-inner">
             <EmptyState
               action={
@@ -156,17 +171,17 @@ export default function PlaylistsPage() {
             />
           </div>
         ) : (
-          /* تغییر معماری: ردیف شدن ستون‌ها از چپ به راست با اسکرول افقی در صورت شلوغ شدن */
+          /* Playlist columns flow horizontally and scroll when the row overflows. */
           <div className="flex flex-row gap-6 overflow-x-auto pb-6 scrollbar-thin">
             {localPlaylists.map((playlist) => (
-              /* ستون مجزا برای هر پلی‌لیست با عرض ثابت دقیقا به اندازه کارت (w-72 یا w-80) */
+              /* Fixed-width column keeps every playlist summary equally readable. */
               <div key={playlist.id} className="w-[320px] shrink-0 rounded-xl border border-white/5 bg-white/[0.02] p-4 shadow-xl flex flex-col gap-4">
                 
-                {/* بخش کارت بالایی پلی‌لیست */}
+                {/* Upper region combines presentational card and management actions. */}
                 <div className="flex flex-col gap-3 relative group">
                   <PlaylistCard playlist={playlist} />
                   
-                  {/* دکمه‌های مدیریتی به صورت کپسول فشرده زیر کارت */}
+                  {/* Add, rename, and delete actions belong to the owning page. */}
                   <div className="flex items-center justify-between gap-1 border-t border-white/5 pt-3">
                     <Link
                       className="inline-flex h-7 items-center justify-center rounded-md bg-white/10 px-2.5 text-[11px] font-bold text-white transition hover:bg-white/20"
@@ -191,7 +206,7 @@ export default function PlaylistsPage() {
                   </div>
                 </div>
 
-                {/* بخش لیست فشرده آهنگ‌های زیر همان پلی‌لیست */}
+                {/* Lower region resolves ordered item IDs into playable TrackCards. */}
                 <div className="border-t border-white/5 pt-3 flex-1 flex flex-col min-h-[150px]">
                   <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-white/50">Tracks ({playlist.itemIds.length})</h3>
                   {playlist.itemIds.length > 0 ? (
@@ -200,6 +215,7 @@ export default function PlaylistsPage() {
                         const track = tracks.find((item) => item.id === trackId);
 
                         if (!track) {
+                          // Ignore stale playlist IDs that no longer exist in catalog.
                           return null;
                         }
 
@@ -225,6 +241,7 @@ export default function PlaylistsPage() {
         )}
       </section>
 
+      {/* The same controlled form creates a title or renames an existing one. */}
       <Modal
         onClose={() => setIsModalOpen(false)}
         open={isModalOpen}

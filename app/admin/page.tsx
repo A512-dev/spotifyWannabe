@@ -13,36 +13,43 @@ import { formatCurrencyFromCents, formatDate, formatNumber } from "@/lib/formatt
 import { useAuth } from "@/providers";
 import type { ArtistRevenueRecord, SubscriptionPrice, SubscriptionTier } from "@/types/domain";
 
+// Settlement status is local UI state layered over immutable revenue seed records.
 type PaymentStatus = "pending" | "settled";
 
 interface SettlementState {
+  /** Audit information recorded when an admin confirms a payout. */
   status: PaymentStatus;
   settledAt?: string;
   settledByUserId?: string;
 }
 
 interface SubscriptionDistributionRow {
+  /** Derived chart/table model; percentage is rounded for display. */
   tier: SubscriptionTier;
   userCount: number;
   percentage: number;
 }
 
 interface AccountingRow extends ArtistRevenueRecord {
+  /** Revenue record enriched with related artist and local settlement data. */
   artistName: string;
   uniqueListeners: number;
   paymentStatus: PaymentStatus;
   settledAt?: string;
 }
 
+// Presentation labels stay separate from stored lowercase tier identifiers.
 const tierLabels: Record<SubscriptionTier, string> = {
   basic: "Basic",
   silver: "Silver",
   gold: "Gold"
 };
 
+// Columns generated from these durations preview multi-month billing totals.
 const billingPeriods = [1, 3, 6, 12];
 
 function calculateSubscriptionDistribution(): SubscriptionDistributionRow[] {
+  // Guarding with 1 prevents division by zero if seed users are ever removed.
   const totalUsers = users.length || 1;
 
   return (["basic", "silver", "gold"] as SubscriptionTier[]).map((tier) => {
@@ -57,6 +64,7 @@ function calculateSubscriptionDistribution(): SubscriptionDistributionRow[] {
 }
 
 function getArtistName(artistId: string) {
+  // Safe fallback keeps accounting usable if relational seed data becomes stale.
   return artists.find((artist) => artist.id === artistId)?.stageName ?? "Unknown artist";
 }
 
@@ -65,9 +73,11 @@ function getArtistMonthlyListeners(artistId: string) {
 }
 
 function parseDollarInput(value: string) {
+  // Convert editable major-unit input into integer cents for reliable arithmetic.
   const numericValue = Number(value);
 
   if (Number.isNaN(numericValue) || numericValue < 0) {
+    // Null distinguishes invalid input from a legitimate zero-dollar price.
     return null;
   }
 
@@ -75,12 +85,15 @@ function parseDollarInput(value: string) {
 }
 
 function formatDollarsFromCents(cents: number) {
+  // Admin number inputs need a plain decimal string, not a currency symbol.
   return (cents / 100).toFixed(2);
 }
 
 export default function AdminPage() {
   const { currentUser } = useAuth();
+  // All mutations are intentionally component-local Phase 1 previews.
   const [subscriptionPrices, setSubscriptionPrices] = useState<SubscriptionPrice[]>(initialSubscriptionPrices);
+  // Inputs are strings so partially typed decimals remain representable.
   const [silverMonthlyInput, setSilverMonthlyInput] = useState(() =>
     formatDollarsFromCents(initialSubscriptionPrices.find((price) => price.tier === "silver")?.monthlyPriceCents ?? 0)
   );
@@ -89,27 +102,33 @@ export default function AdminPage() {
   );
   const [pricingMessage, setPricingMessage] = useState("");
   const [maintenanceMode, setMaintenanceMode] = useState(false);
+  // Settlement map is keyed by revenue-record ID without mutating seed records.
   const [settlements, setSettlements] = useState<Record<string, SettlementState>>({});
   const [selectedSettlementId, setSelectedSettlementId] = useState<string | null>(null);
 
+  // Distribution is derived solely from static seed users and needs one calculation.
   const subscriptionDistribution = useMemo(() => calculateSubscriptionDistribution(), []);
+  // Role and workflow counts drive the summary cards.
   const pendingApprovalsCount = artistApprovalRequests.filter((item) => item.status === "pending").length;
   const supportUsersCount = users.filter((user) => user.role === "support").length;
   const artistUsersCount = users.filter((user) => user.role === "artist").length;
   const listenerUsersCount = users.filter((user) => user.role === "listener").length;
 
   const monthlySubscriptionRevenueCents = users.reduce((sum, user) => {
+    // Model one month of revenue by summing the current price of each user's tier.
     const price = subscriptionPrices.find((item) => item.tier === user.subscriptionTier);
 
     return sum + (price?.monthlyPriceCents ?? 0);
   }, 0);
 
+  // Artist net payout and platform fees come from monthly revenue records.
   const totalArtistPayoutCents = artistRevenueRecords.reduce((sum, record) => sum + record.netRevenueCents, 0);
 
   const estimatedPlatformNetCents =
     artistRevenueRecords.reduce((sum, record) => sum + record.platformFeeCents, 0) + monthlySubscriptionRevenueCents;
 
   const accountingRows = useMemo<AccountingRow[]>(
+    // Enrich immutable financial records for the generic Table component.
     () =>
       artistRevenueRecords.map((record) => ({
         ...record,
@@ -122,11 +141,13 @@ export default function AdminPage() {
   );
 
   const selectedSettlementRow = useMemo(
+    // Modal visibility and content are derived from the selected record ID.
     () => accountingRows.find((row) => row.id === selectedSettlementId) ?? null,
     [accountingRows, selectedSettlementId]
   );
 
   const pieGradient = useMemo(() => {
+    // Build cumulative stop positions for Basic, Silver, then remaining Gold.
     const basic = subscriptionDistribution.find((row) => row.tier === "basic")?.percentage ?? 0;
     const silver = subscriptionDistribution.find((row) => row.tier === "silver")?.percentage ?? 0;
     const basicEnd = basic;
@@ -136,6 +157,7 @@ export default function AdminPage() {
   }, [subscriptionDistribution]);
 
   const updateSubscriptionPrices = () => {
+    // Validate both editable tiers as one atomic pricing update.
     const silverMonthlyCents = parseDollarInput(silverMonthlyInput);
     const goldMonthlyCents = parseDollarInput(goldMonthlyInput);
 
@@ -145,6 +167,7 @@ export default function AdminPage() {
     }
 
     if (silverMonthlyCents > goldMonthlyCents) {
+      // Preserve the intended plan ordering.
       setPricingMessage("Silver should not be more expensive than Gold.");
       return;
     }
@@ -152,6 +175,7 @@ export default function AdminPage() {
     setSubscriptionPrices((currentPrices) =>
       currentPrices.map((price) => {
         if (price.tier === "silver") {
+          // Annual preview applies the mock "pay for 10 months" rule.
           return {
             ...price,
             monthlyPriceCents: silverMonthlyCents,
@@ -167,6 +191,7 @@ export default function AdminPage() {
           };
         }
 
+        // Basic remains permanently free.
         return price;
       })
     );
@@ -175,11 +200,13 @@ export default function AdminPage() {
   };
 
   const confirmSettlement = () => {
+    // Ignore stale modal actions if the selected row disappeared.
     if (!selectedSettlementRow) {
       return;
     }
 
     setSettlements((currentSettlements) => ({
+      // Merge one record's audit state without discarding other settlements.
       ...currentSettlements,
       [selectedSettlementRow.id]: {
         status: "settled",
@@ -188,9 +215,11 @@ export default function AdminPage() {
       }
     }));
 
+    // Closing the modal also clears its selection.
     setSelectedSettlementId(null);
   };
 
+  // Generic Table columns keep rendering/accessor logic adjacent to this page.
   const priceColumns: TableColumn<SubscriptionPrice>[] = [
     {
       key: "tier",
@@ -225,6 +254,7 @@ export default function AdminPage() {
   ];
 
   const billingColumns: TableColumn<SubscriptionPrice>[] = [
+    // Spread-generated period columns avoid four manually duplicated definitions.
     {
       key: "tier",
       header: "Tier",
@@ -242,6 +272,7 @@ export default function AdminPage() {
       key: "artist",
       header: "Artist",
       render: (row) => (
+        // Settled rows cannot be confirmed twice.
         <div>
           <p className="font-medium text-slate-50">{row.artistName}</p>
           <p className="text-xs text-slate-400">{row.artistId}</p>
@@ -295,6 +326,7 @@ export default function AdminPage() {
   ];
 
   const userColumns: TableColumn<(typeof users)[number]>[] = [
+    // typeof users[number] keeps columns synchronized with the User model.
     {
       key: "user",
       header: "User",
@@ -333,6 +365,7 @@ export default function AdminPage() {
     }
   ];
 
+  // Pricing workspace: editable form plus current configuration/billing previews.
   const pricingTab = (
     <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
       <Card>
@@ -382,6 +415,7 @@ export default function AdminPage() {
     </div>
   );
 
+  // Analytics workspace: subscription distribution and aggregate money flows.
   const analyticsTab = (
     <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
       <Card>
@@ -389,6 +423,7 @@ export default function AdminPage() {
         <p className="mt-2 text-sm text-slate-400">A simple Phase 1 pie visualization based on mock users.</p>
 
         <div className="mt-6 flex flex-col items-center gap-5 sm:flex-row">
+          {/* CSS conic-gradient avoids a chart dependency for this small mock. */}
           <div
             aria-label="Subscription distribution chart"
             className="h-40 w-40 rounded-full border border-surface-600"
@@ -450,6 +485,7 @@ export default function AdminPage() {
     </div>
   );
 
+  // Accounting workspace: monthly artist records and settlement workflow.
   const accountingTab = (
     <Card>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -473,6 +509,7 @@ export default function AdminPage() {
     </Card>
   );
 
+  // Access workspace: mock maintenance switch and account/role inventory.
   const accessTab = (
     <div className="grid gap-4 xl:grid-cols-[0.7fr_1.3fr]">
       <Card>
@@ -516,6 +553,7 @@ export default function AdminPage() {
       />
 
       {currentUser && currentUser.role !== "admin" ? (
+        /* MainAppLayout blocks this normally; the warning is defense in depth. */
         <Card className="mt-6 border-red-500/30 bg-red-500/10">
           <h2 className="text-lg font-semibold text-red-100">Admin-only workspace</h2>
           <p className="mt-2 text-sm text-red-100/80">This page is designed for the single system admin role.</p>
@@ -523,6 +561,7 @@ export default function AdminPage() {
       ) : null}
 
       <section className="mt-6 grid gap-4 md:grid-cols-4">
+        {/* Financial and workflow health at a glance. */}
         <StatCard label="Monthly subscription revenue" value={formatCurrencyFromCents(monthlySubscriptionRevenueCents)} />
         <StatCard label="Estimated platform net" value={formatCurrencyFromCents(estimatedPlatformNetCents)} />
         <StatCard label="Pending approvals" value={String(pendingApprovalsCount)} />
@@ -530,12 +569,14 @@ export default function AdminPage() {
       </section>
 
       <section className="mt-6 grid gap-4 md:grid-cols-3">
+        {/* Role population snapshot from the shared user seeds. */}
         <StatCard helperText={`${listenerUsersCount} listeners in mock data`} label="Listener users" value={String(listenerUsersCount)} />
         <StatCard helperText={`${artistUsersCount} artist accounts in mock data`} label="Artist users" value={String(artistUsersCount)} />
         <StatCard helperText={`${supportUsersCount} support users in mock data`} label="Support users" value={String(supportUsersCount)} />
       </section>
 
       <section className="mt-6">
+        {/* Large workspaces stay manageable behind four client-side tabs. */}
         <Tabs
           defaultTabId="pricing"
           tabs={[
@@ -564,6 +605,7 @@ export default function AdminPage() {
       </section>
 
       <Modal open={Boolean(selectedSettlementRow)} title="Confirm artist settlement" onClose={() => setSelectedSettlementId(null)}>
+        {/* Selection-derived content prevents confirming an unspecified payout. */}
         {selectedSettlementRow ? (
           <div className="space-y-4">
             <p className="text-sm leading-6 text-slate-300">

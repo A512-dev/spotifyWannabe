@@ -14,10 +14,12 @@ export default function HomePage() {
   const router = useRouter();
   const { currentUser } = useAuth();
 
+  // Resolve normalized artist IDs only at the presentation boundary.
   const getArtistName = (artistId: string) => {
     return artists.find((a) => a.id === artistId)?.stageName || "Unknown Artist";
   };
 
+  // Phase 1 recommendations are deterministic slices, not personalized ranking.
   const recommendedTracks = tracks.slice(0, 4);
   const featuredAlbums = albums.slice(0, 4);
 
@@ -29,6 +31,7 @@ export default function HomePage() {
       />
 
       {currentUser?.subscriptionTier === "basic" && (
+        /* Basic listeners receive a contextual upsell to subscription settings. */
         <div className="mt-6 flex items-center justify-between rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/20 to-orange-500/20 p-6">
           <div>
             <h3 className="text-lg font-bold text-amber-500">Upgrade to Premium</h3>
@@ -43,13 +46,14 @@ export default function HomePage() {
       )}
 
       <section className="mt-8">
+        {/* TrackCard starts playback through shared player context. */}
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-xl font-bold text-white">Recommended Tracks</h2>
           <Link className="text-sm font-semibold text-white/70 hover:text-white transition-colors" href="/music">
             View All
           </Link>
         </div>
-        {/* تغییر کلیدی: تبدیل گرید به یک لیست عمودی */}
+        {/* A vertical list gives each recommendation room for playback metadata. */}
         <div className="flex flex-col gap-3">
           {recommendedTracks.map((track) => (
             <TrackCard 
@@ -62,6 +66,7 @@ export default function HomePage() {
       </section>
 
       <section className="mt-8">
+        {/* Album tiles link to release pages; AlbumCard also links its artist. */}
         <h2 className="mb-4 text-xl font-bold text-white">Featured Albums</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {featuredAlbums.map((album) => (

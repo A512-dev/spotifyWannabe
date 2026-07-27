@@ -14,6 +14,7 @@ export default function ForgotPasswordPage() {
   const [successMessage, setSuccessMessage] = useState("");
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    // No email is sent in Phase 1; AuthProvider validates the mock request shape.
     event.preventDefault();
     setError("");
     setSuccessMessage("");
@@ -25,6 +26,7 @@ export default function ForgotPasswordPage() {
       return;
     }
 
+    // Generic wording avoids confirming whether a particular account exists.
     setSuccessMessage("If an account exists for this email, password recovery instructions have been sent.");
   };
 

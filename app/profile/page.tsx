@@ -12,6 +12,7 @@ import { canEditProfileImage } from "@/lib/subscription";
 import { useAuth } from "@/providers";
 import type { Gender } from "@/types/domain";
 
+// Shared option data serves both the edit select and read-only label lookup.
 const genderOptions = [
   { label: "Select gender", value: "" },
   { label: "Female", value: "female" },
@@ -21,11 +22,13 @@ const genderOptions = [
 ];
 
 function getGenderLabel(gender?: Gender) {
+  // Missing/unknown values receive a human-readable fallback.
   return genderOptions.find((option) => option.value === gender)?.label ?? "Not set";
 }
 
 export default function ProfilePage() {
   const { currentUser, updateCurrentUser } = useAuth();
+  // Editable form state is synchronized from the current provider user below.
   const [displayName, setDisplayName] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [gender, setGender] = useState<Gender | "">("");
@@ -34,6 +37,7 @@ export default function ProfilePage() {
   const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
+    // Auth hydrates after the initial render, so copy values when it becomes ready.
     if (!currentUser) {
       return;
     }
@@ -45,9 +49,11 @@ export default function ProfilePage() {
   }, [currentUser]);
 
   if (!currentUser) {
+    // MainAppLayout owns redirect/loading behavior; this protects field access.
     return <MainAppLayout>Loading profile...</MainAppLayout>;
   }
 
+  // Metrics come from mock aggregates; avatar editability comes from plan rules.
   const stats = getProfileStats(currentUser.id);
   const canEditAvatar = canEditProfileImage(currentUser);
 
@@ -62,6 +68,7 @@ export default function ProfilePage() {
     }
 
     const result = updateCurrentUser({
+      // Basic users retain the existing avatar even if stale local input exists.
       avatarUrl: canEditAvatar ? avatarUrl.trim() || undefined : currentUser.avatarUrl,
       birthDate: birthDate || undefined,
       displayName: displayName.trim(),
@@ -83,6 +90,7 @@ export default function ProfilePage() {
         title="Profile"
       />
       <section className="mt-6 grid gap-4 lg:grid-cols-[1fr_2fr]">
+        {/* Left card is identity detail; right grid summarizes account metrics. */}
         <Card>
           <Avatar className="h-24 w-24 text-2xl" name={currentUser.displayName} src={currentUser.avatarUrl} />
           <h2 className="mt-4 text-xl font-semibold text-slate-50">{currentUser.displayName}</h2>
@@ -114,6 +122,7 @@ export default function ProfilePage() {
         </div>
       </section>
       <section className="mt-6">
+        {/* Email/system username are immutable; profile fields update AuthProvider. */}
         <Card>
           <h2 className="text-lg font-semibold text-slate-50">Edit profile</h2>
           <form className="mt-4 grid gap-4 md:grid-cols-2" onSubmit={handleSave}>

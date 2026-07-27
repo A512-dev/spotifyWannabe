@@ -12,25 +12,30 @@ import { tracks } from "@/data/tracks";
 import { usePlayer } from "@/providers";
 
 interface AlbumPageProps {
+  // Dynamic App Router params are asynchronous in the current Next.js version.
   params: Promise<{
     id: string;
   }>;
 }
 
 export default function AlbumPage({ params }: AlbumPageProps) {
+  // React `use` unwraps the route-param promise in this client component.
   const { id } = use(params);
   const router = useRouter();
   const { playerState, setPlayerState } = usePlayer();
+  // Resolve album relations and preserve album.trackIds order as the queue.
   const album = albums.find((item) => item.id === id);
   const albumTracks = tracks.filter((track) => album?.trackIds.includes(track.id));
   const artist = artists.find((item) => item.id === album?.artistId);
   const queueTrackIds = albumTracks.map((track) => track.id);
 
   const playAlbumFrom = (trackId?: string) => {
+    // Empty albums/missing IDs are safe no-ops.
     if (!trackId || queueTrackIds.length === 0) {
       return;
     }
 
+    // Storage lets PlayerShell reconstruct this album-specific queue.
     localStorage.setItem("soundwave_active_queue", JSON.stringify(queueTrackIds));
     setPlayerState({
       ...playerState,
@@ -45,6 +50,8 @@ export default function AlbumPage({ params }: AlbumPageProps) {
       return;
     }
 
+    // Timestamp modulus gives a lightweight pseudo-random starting index for demo
+    // purposes; subsequent next/previous controls still use album order.
     const randomTrackId = queueTrackIds[Math.floor(event.timeStamp) % queueTrackIds.length];
     playAlbumFrom(randomTrackId);
   };
@@ -53,6 +60,7 @@ export default function AlbumPage({ params }: AlbumPageProps) {
     <MainAppLayout>
       {album ? (
         <>
+          {/* Hero combines release artwork, ownership, date, and track count. */}
           <div className="mb-8 flex flex-col items-center gap-6 sm:flex-row sm:items-end mt-4">
             {album.coverImageUrl ? (
               <img
@@ -93,6 +101,7 @@ export default function AlbumPage({ params }: AlbumPageProps) {
           </div>
 
           <div className="mb-8 flex items-center gap-4">
+            {/* Play starts at track one; Shuffle chooses a starting track. */}
             <Button
               className="rounded-full px-8 py-3 text-base font-bold"
               onClick={() => playAlbumFrom(queueTrackIds[0])}
@@ -112,6 +121,7 @@ export default function AlbumPage({ params }: AlbumPageProps) {
           </div>
 
           <section className="grid gap-2">
+            {/* Each TrackCard installs this album's ordered queue when selected. */}
             <div className="mb-2 grid grid-cols-[auto_1fr_auto] gap-4 border-b border-surface-700 pb-2 px-4 text-sm text-slate-400">
               <span>#</span>
               <span>Title</span>
@@ -130,6 +140,7 @@ export default function AlbumPage({ params }: AlbumPageProps) {
           </section>
         </>
       ) : (
+        /* Invalid dynamic IDs receive a recoverable catalog link. */
         <EmptyState 
           action={
             <Button onClick={() => router.push("/music")} variant="secondary">

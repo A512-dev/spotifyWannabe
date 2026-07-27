@@ -12,9 +12,11 @@ import { formatCurrencyFromCents, formatDate, formatDuration, formatNumber } fro
 import { useAuth } from "@/providers";
 import type { Track } from "@/types/domain";
 
+// Release type controls which media inputs and validation rules the form uses.
 type ReleaseType = "single" | "album";
 
 interface AlbumTrackDraft {
+  /** Form-only row for one album track, including optional edit linkage. */
   id: string;
   title: string;
   audioFileName: string;
@@ -23,6 +25,7 @@ interface AlbumTrackDraft {
 }
 
 interface DraftRelease {
+  /** Complete controlled form model for both single and album workflows. */
   title: string;
   releaseType: ReleaseType;
   genre: string;
@@ -35,6 +38,7 @@ interface DraftRelease {
 }
 
 interface ManagedTrack extends Track {
+  /** Client-management fields layered over the shared catalog Track contract. */
   localStatus: "published" | "draft";
   genre?: string;
   lyrics?: string;
@@ -43,6 +47,7 @@ interface ManagedTrack extends Track {
 }
 
 interface CatalogReleaseGroup {
+  /** View model groups several album tracks into one manageable release card. */
   id: string;
   releaseType: ReleaseType;
   title: string;
@@ -51,6 +56,7 @@ interface CatalogReleaseGroup {
   releaseDate: string;
 }
 
+// File-name validation is intentionally extension-based in this browser mock.
 const ACCEPTED_AUDIO_FORMATS = ["mp3", "wav", "flac"];
 
 function createAlbumTrackDraft(
@@ -60,6 +66,7 @@ function createAlbumTrackDraft(
   title?: string,
   lyrics = ""
 ): AlbumTrackDraft {
+  // Existing IDs make edit rows stable; new rows use a local timestamp key.
   return {
     id: existingTrackId ? `edit-${existingTrackId}` : `album-track-${Date.now()}-${index}`,
     title: title ?? (fileName ? getFileNameWithoutExtension(fileName) : ""),
@@ -70,6 +77,7 @@ function createAlbumTrackDraft(
 }
 
 function createInitialDraft(): DraftRelease {
+  // A single blank album row is retained so switching types always has a form.
   return {
     title: "",
     releaseType: "single",
@@ -84,36 +92,44 @@ function createInitialDraft(): DraftRelease {
 }
 
 function getFileNameWithoutExtension(fileName: string) {
+  // Turn an uploaded file name into a reasonable editable default track title.
   return fileName.replace(/\.[^/.]+$/, "").replace(/[-_]+/g, " ").trim();
 }
 
 function getFileNameFromUrl(url?: string) {
+  // Existing mock media URLs are reduced back to file names for edit inputs.
   if (!url) {
     return "";
   }
 
+  // Decode spaces/special characters that may have been URL-encoded.
   return decodeURIComponent(url.split("/").pop() ?? "");
 }
 
 function getUpdatedMediaUrl(fileName: string, previousUrl?: string) {
+  // Empty file input means "keep current media" during edits.
   if (!fileName) {
     return previousUrl;
   }
 
   if (previousUrl && getFileNameFromUrl(previousUrl) === fileName) {
+    // Preserve exact existing URLs when the chosen name has not changed.
     return previousUrl;
   }
 
+  // Phase 1 records a plausible future upload path without uploading bytes.
   return `/mock/uploads/${fileName}`;
 }
 
 function isAcceptedAudioFile(fileName: string) {
+  // Case-insensitive final extension check; MIME validation belongs on a backend.
   const extension = fileName.split(".").pop()?.toLowerCase();
 
   return Boolean(extension && ACCEPTED_AUDIO_FORMATS.includes(extension));
 }
 
 function createSingleDraftTrack(input: DraftRelease, artistId: string): ManagedTrack {
+  // Convert form strings into a Track-compatible, unpublished local catalog item.
   return {
     id: `local-track-${Date.now()}`,
     title: input.title.trim(),
@@ -138,6 +154,7 @@ function createAlbumDraftTrack(
   albumId: string,
   index: number
 ): ManagedTrack {
+  // Each album row becomes a separate Track linked by one shared album ID.
   const trackTitle = albumTrack.title.trim() || `${input.title.trim()} - Track ${index + 1}`;
 
   return {
@@ -162,20 +179,24 @@ function createAlbumDraftTrack(
 export default function ArtistDashboardPage() {
   const { currentUser } = useAuth();
 
+  // The auth user links to a public ArtistProfile through artistProfileId.
   const currentArtist = useMemo(
     () => artists.find((artist) => artist.id === currentUser?.artistProfileId) ?? null,
     [currentUser?.artistProfileId]
   );
 
+  // Clone global catalog tracks before attaching mutable local management status.
   const [managedTracks, setManagedTracks] = useState<ManagedTrack[]>(() =>
     mockTracks.map((track) => ({ ...track, localStatus: "published" }))
   );
 
+  // One controlled draft form switches between create and edit modes.
   const [draft, setDraft] = useState<DraftRelease>(() => createInitialDraft());
   const [formMessage, setFormMessage] = useState<string>("");
   const [editingReleaseId, setEditingReleaseId] = useState<string | null>(null);
 
   const artistTracks = useMemo(() => {
+    // Catalog view contains only tracks owned by the linked artist.
     if (!currentArtist) {
       return [];
     }
@@ -184,6 +205,7 @@ export default function ArtistDashboardPage() {
   }, [currentArtist, managedTracks]);
 
   const artistAlbums = useMemo(() => {
+    // Persisted mock albums remain separate from albums created in local state.
     if (!currentArtist) {
       return [];
     }
@@ -192,16 +214,20 @@ export default function ArtistDashboardPage() {
   }, [currentArtist]);
 
   const catalogReleaseGroups = useMemo<CatalogReleaseGroup[]>(() => {
+    // Group normalized ManagedTracks: albumId joins album tracks, while singles
+    // each become their own one-track release group.
     const albumGroups = new Map<string, CatalogReleaseGroup>();
     const orderedGroups: CatalogReleaseGroup[] = [];
 
     artistTracks.forEach((track) => {
       if (track.albumId) {
+        // Prefer locally edited title, then seed album title, then a fallback.
         const mockAlbum = mockAlbums.find((album) => album.id === track.albumId);
         const albumTitle = track.albumTitle ?? mockAlbum?.title ?? "Untitled album";
         const existingGroup = albumGroups.get(track.albumId);
 
         if (existingGroup) {
+          // Preserve artist-track iteration order within the album.
           existingGroup.tracks.push(track);
           return;
         }
@@ -221,6 +247,7 @@ export default function ArtistDashboardPage() {
       }
 
       orderedGroups.push({
+        // A track without albumId is modeled as a standalone single.
         id: track.id,
         releaseType: "single",
         title: track.title,
@@ -234,6 +261,7 @@ export default function ArtistDashboardPage() {
   }, [artistTracks]);
 
   const artistRevenue = useMemo(() => {
+    // Financial reports are scoped to the linked artist profile.
     if (!currentArtist) {
       return [];
     }
@@ -241,10 +269,12 @@ export default function ArtistDashboardPage() {
     return artistRevenueRecords.filter((record) => record.artistId === currentArtist.id);
   }, [currentArtist]);
 
+  // Summary metrics combine immutable seed aggregates and local catalog edits.
   const totalStreams = artistTracks.reduce((sum, track) => sum + track.playCount, 0);
   const totalRevenueCents = artistRevenue.reduce((sum, record) => sum + record.netRevenueCents, 0);
   const existingArtistAlbumIds = new Set(artistAlbums.map((album) => album.id));
   const localAlbumIds = artistTracks.reduce<string[]>((albumIds, track) => {
+    // Count locally created albums without double-counting seed album IDs.
     if (track.albumId && !existingArtistAlbumIds.has(track.albumId)) {
       albumIds.push(track.albumId);
     }
@@ -252,13 +282,16 @@ export default function ArtistDashboardPage() {
     return albumIds;
   }, []);
   const localAlbumCount = new Set(localAlbumIds).size;
+  // Approval is the business gate for all catalog-management controls.
   const canManageCatalog = currentArtist?.approvalStatus === "approved";
 
   const updateDraft = (key: keyof DraftRelease, value: string | AlbumTrackDraft[]) => {
+    // Generic immutable field update keeps individual input handlers small.
     setDraft((currentDraft) => ({ ...currentDraft, [key]: value }));
   };
 
   const handleReleaseTypeChange = (releaseType: ReleaseType) => {
+    // Preserve current fields while guaranteeing album mode has at least one row.
     setDraft((currentDraft) => ({
       ...currentDraft,
       releaseType,
@@ -268,6 +301,7 @@ export default function ArtistDashboardPage() {
   };
 
   const handleAudioFileChange = (fileName: string) => {
+    // Store the browser-provided name, then surface extension validation feedback.
     updateDraft("audioFileName", fileName);
 
     if (fileName && !isAcceptedAudioFile(fileName)) {
@@ -279,6 +313,7 @@ export default function ArtistDashboardPage() {
   };
 
   const handleAlbumFilesChange = (files: FileList | null) => {
+    // Multiple file selection replaces album rows and derives initial titles.
     const fileNames = Array.from(files ?? []).map((file) => file.name);
 
     if (fileNames.length === 0) {
@@ -300,6 +335,7 @@ export default function ArtistDashboardPage() {
   };
 
   const handleAlbumTrackChange = (trackId: string, key: keyof AlbumTrackDraft, value: string) => {
+    // Update only the targeted row/field without mutating the albumTracks array.
     setDraft((currentDraft) => ({
       ...currentDraft,
       albumTracks: currentDraft.albumTracks.map((track) => (track.id === trackId ? { ...track, [key]: value } : track))
@@ -307,6 +343,7 @@ export default function ArtistDashboardPage() {
   };
 
   const handleAlbumTrackFileChange = (trackId: string, fileName: string) => {
+    // Reuse row update, then validate the newly chosen file independently.
     handleAlbumTrackChange(trackId, "audioFileName", fileName);
 
     if (fileName && !isAcceptedAudioFile(fileName)) {
@@ -318,6 +355,7 @@ export default function ArtistDashboardPage() {
   };
 
   const handleAddAlbumTrack = () => {
+    // Append a blank row with a sequence-derived local ID.
     setDraft((currentDraft) => ({
       ...currentDraft,
       albumTracks: [...currentDraft.albumTracks, createAlbumTrackDraft(currentDraft.albumTracks.length + 1)]
@@ -325,6 +363,7 @@ export default function ArtistDashboardPage() {
   };
 
   const handleRemoveAlbumTrack = (trackId: string) => {
+    // Never leave the form with zero rows; reset the last row instead.
     setDraft((currentDraft) => ({
       ...currentDraft,
       albumTracks:
@@ -335,6 +374,7 @@ export default function ArtistDashboardPage() {
   };
 
   const replaceReleaseTracks = (oldTrackIds: string[], updatedTracks: ManagedTrack[]) => {
+    // Replace a single or all tracks of an album at their original catalog position.
     const oldTrackIdSet = new Set(oldTrackIds);
 
     setManagedTracks((currentTracks) => {
@@ -344,6 +384,7 @@ export default function ArtistDashboardPage() {
       currentTracks.forEach((track) => {
         if (oldTrackIdSet.has(track.id)) {
           if (!insertedUpdatedRelease) {
+            // Insert the edited group once when the first old member is encountered.
             nextTracks.push(...updatedTracks);
             insertedUpdatedRelease = true;
           }
@@ -355,6 +396,7 @@ export default function ArtistDashboardPage() {
       });
 
       if (!insertedUpdatedRelease) {
+        // Defensive fallback if the original release disappeared before save.
         return [...updatedTracks, ...currentTracks];
       }
 
@@ -363,6 +405,7 @@ export default function ArtistDashboardPage() {
   };
 
   const handleStartEditRelease = (release: CatalogReleaseGroup) => {
+    // Populate the shared form from the release's first/common metadata.
     const firstTrack = release.tracks[0];
 
     if (!firstTrack) {
@@ -382,6 +425,7 @@ export default function ArtistDashboardPage() {
       audioFileName: release.releaseType === "single" ? getFileNameFromUrl(firstTrack.audioUrl) : "",
       albumTracks:
         release.releaseType === "album"
+          // Every current album track gets its own editable row and linkage ID.
           ? release.tracks.map((track, index) =>
               createAlbumTrackDraft(index + 1, getFileNameFromUrl(track.audioUrl), track.id, track.title, track.lyrics ?? "")
             )
@@ -392,12 +436,14 @@ export default function ArtistDashboardPage() {
   };
 
   const handleCancelEdit = () => {
+    // Return the entire form to a clean create-mode state.
     setEditingReleaseId(null);
     setDraft(createInitialDraft());
     setFormMessage("");
   };
 
   const handleSaveEditedRelease = () => {
+    // Editing requires both a selected release and linked artist.
     if (!editingReleaseId || !currentArtist) {
       return;
     }
@@ -415,9 +461,11 @@ export default function ArtistDashboardPage() {
     }
 
     const normalizedReleaseDate = `${draft.releaseYear || new Date().getFullYear()}-01-01T00:00:00.000Z`;
+    // Replacement works on every track ID in case this is an album.
     const oldTrackIds = release.tracks.map((track) => track.id);
 
     if (release.releaseType === "single") {
+      // Release type is locked while editing, so validate against stored type.
       const existingTrack = release.tracks[0];
 
       if (!existingTrack) {
@@ -431,6 +479,7 @@ export default function ArtistDashboardPage() {
       }
 
       const updatedSingle: ManagedTrack = {
+        // Preserve streams/duration/status while replacing editable metadata.
         ...existingTrack,
         title: draft.title.trim(),
         genre: draft.genre,
@@ -450,6 +499,7 @@ export default function ArtistDashboardPage() {
 
     const activeAlbumTracks = draft.albumTracks.filter((track) => track.title.trim() || track.audioFileName);
 
+    // Ignore completely blank rows, then require a real album of at least two.
     if (activeAlbumTracks.length < 2) {
       setFormMessage("Album releases need at least two tracks.");
       return;
@@ -472,6 +522,7 @@ export default function ArtistDashboardPage() {
     const previousTracksById = new Map(release.tracks.map((track) => [track.id, track]));
 
     const updatedAlbumTracks: ManagedTrack[] = activeAlbumTracks.map((albumTrack, index) => {
+      // Existing rows retain operational metrics; newly added rows start empty.
       const previousTrack = albumTrack.existingTrackId ? previousTracksById.get(albumTrack.existingTrackId) : undefined;
 
       return {
@@ -500,6 +551,7 @@ export default function ArtistDashboardPage() {
   };
 
   const handleCreateDraft = () => {
+    // Guard linkage and approval before any form-specific validation.
     if (!currentArtist) {
       setFormMessage("No artist profile is linked to this account.");
       return;
@@ -516,6 +568,7 @@ export default function ArtistDashboardPage() {
     }
 
     if (draft.releaseType === "single") {
+      // Single creation needs one accepted audio file.
       if (!draft.audioFileName || !isAcceptedAudioFile(draft.audioFileName)) {
         setFormMessage("Please select a valid MP3, WAV, or FLAC audio file.");
         return;
@@ -529,6 +582,7 @@ export default function ArtistDashboardPage() {
 
     const activeAlbumTracks = draft.albumTracks.filter((track) => track.title.trim() || track.audioFileName);
 
+    // Album creation mirrors edit validation: at least two complete valid rows.
     if (activeAlbumTracks.length < 2) {
       setFormMessage("Album releases need at least two tracks. Select multiple files or add track rows manually.");
       return;
@@ -549,6 +603,7 @@ export default function ArtistDashboardPage() {
     }
 
     const albumId = `local-album-${Date.now()}`;
+    // One generated album ID groups every new Track record.
     const albumDraftTracks = activeAlbumTracks.map((track, index) =>
       createAlbumDraftTrack(draft, track, currentArtist.id, albumId, index)
     );
@@ -559,15 +614,18 @@ export default function ArtistDashboardPage() {
   };
 
   const handlePublishRelease = (trackIds: string[]) => {
+    // Publishing an album updates all member tracks as one release action.
     setManagedTracks((currentTracks) =>
       currentTracks.map((track) => (trackIds.includes(track.id) ? { ...track, localStatus: "published" } : track))
     );
   };
 
   const handleDeleteRelease = (trackIds: string[]) => {
+    // Delete all supplied members (one single or a complete album).
     setManagedTracks((currentTracks) => currentTracks.filter((track) => !trackIds.includes(track.id)));
 
     if (editingReleaseId) {
+      // If the open form targets the deleted release, exit edit mode too.
       const editingRelease = catalogReleaseGroups.find((release) => release.id === editingReleaseId);
       const editingTrackIds = editingRelease?.tracks.map((track) => track.id) ?? [];
 
@@ -577,6 +635,7 @@ export default function ArtistDashboardPage() {
     }
   };
 
+  // Revenue table formatting remains local while data stays strongly typed.
   const revenueColumns: TableColumn<(typeof artistRevenueRecords)[number]>[] = [
     {
       key: "period",
@@ -606,6 +665,7 @@ export default function ArtistDashboardPage() {
   ];
 
   if (!currentUser) {
+    // DashboardLayout/MainAppLayout handle auth; this protects relation access.
     return <DashboardLayout eyebrow="Artist workspace">Loading artist workspace...</DashboardLayout>;
   }
 
@@ -617,6 +677,7 @@ export default function ArtistDashboardPage() {
       />
 
       {!currentArtist ? (
+        /* Non-artist accounts get a clear explanation rather than empty controls. */
         <Card className="mt-6 border-yellow-500/30 bg-yellow-500/10">
           <h2 className="text-lg font-semibold text-yellow-100">No artist profile linked</h2>
           <p className="mt-2 text-sm text-yellow-100/80">
@@ -628,6 +689,7 @@ export default function ArtistDashboardPage() {
       {currentArtist ? (
         <>
           <section className="mt-6 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+            {/* Identity/approval summary and an explicit permissions explanation. */}
             <Card>
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
@@ -665,6 +727,7 @@ export default function ArtistDashboardPage() {
           </section>
 
           <section className="mt-6 grid gap-4 md:grid-cols-4">
+            {/* Artist health metrics combine profile, catalog, and revenue sources. */}
             <StatCard label="Monthly listeners" value={formatNumber(currentArtist.monthlyListeners)} />
             <StatCard label="Total streams" value={formatNumber(totalStreams)} />
             <StatCard label="Published albums" value={formatNumber(artistAlbums.length + localAlbumCount)} />
@@ -672,6 +735,7 @@ export default function ArtistDashboardPage() {
           </section>
 
           <section className="mt-6 grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+            {/* Left: create/edit form. Right: grouped catalog release management. */}
             <Card>
               <h2 className="text-lg font-semibold text-slate-50">
                 {editingReleaseId ? "Edit release" : "Create release draft"}
@@ -732,6 +796,7 @@ export default function ArtistDashboardPage() {
                 />
 
                 {draft.releaseType === "single" ? (
+                  /* Single mode has one audio input and one lyric field. */
                   <>
                     <Input
                       accept="audio/mpeg,audio/wav,audio/flac,.mp3,.wav,.flac"
@@ -753,6 +818,7 @@ export default function ArtistDashboardPage() {
                     />
                   </>
                 ) : (
+                  /* Album mode manages a dynamic list of independently validated tracks. */
                   <div className="rounded-xl border border-surface-600 bg-surface-900/70 p-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
@@ -780,6 +846,7 @@ export default function ArtistDashboardPage() {
                     </div>
 
                     <div className="mt-4 space-y-4">
+                      {/* Each draft row owns title, media name, lyrics, and edit linkage. */}
                       {draft.albumTracks.map((albumTrack, index) => (
                         <div key={albumTrack.id} className="rounded-lg border border-surface-700 bg-surface-800/70 p-4">
                           <div className="flex items-center justify-between gap-3">
@@ -870,6 +937,7 @@ export default function ArtistDashboardPage() {
                 ) : (
                   <div className="space-y-4">
                     {catalogReleaseGroups.map((release) => {
+                      // Derive group-level status and aggregates from member tracks.
                       const isAlbum = release.releaseType === "album";
                       const releaseStatus = release.tracks.some((track) => track.localStatus === "draft") ? "draft" : "published";
                       const releaseStreams = release.tracks.reduce((sum, track) => sum + track.playCount, 0);
@@ -917,6 +985,7 @@ export default function ArtistDashboardPage() {
                           </div>
 
                           <div className="mt-4 overflow-hidden rounded-lg border border-surface-700">
+                            {/* Nested table reveals each album member's individual state. */}
                             <div className="grid grid-cols-[0.6fr_2fr_1fr_1fr] gap-3 bg-surface-800 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
                               <span>#</span>
                               <span>Track</span>
@@ -955,6 +1024,7 @@ export default function ArtistDashboardPage() {
           </section>
 
           <section className="mt-6">
+            {/* Monthly finance records are read-only and backend-ready in Phase 1. */}
             <Card>
               <h2 className="text-lg font-semibold text-slate-50">Monthly revenue reports</h2>
               <p className="mt-2 text-sm text-slate-400">

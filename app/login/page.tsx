@@ -11,6 +11,8 @@ import { getPostLoginPath } from "@/lib/auth";
 import { useAuth } from "@/providers";
 
 function getSafeNextPath(nextPath: string | null) {
+  // Accept internal absolute paths only. Rejecting protocol-relative `//` paths
+  // prevents an external redirect after successful login.
   if (!nextPath || !nextPath.startsWith("/") || nextPath.startsWith("//")) {
     return null;
   }
@@ -22,12 +24,14 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuth();
+  // Controlled inputs and status state make validation/submission feedback local.
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    // Keep the browser on this client route and delegate auth to AuthProvider.
     event.preventDefault();
     setError("");
     setIsSubmitting(true);
@@ -35,11 +39,13 @@ function LoginForm() {
     const user = login(email, password);
 
     if (!user) {
+      // Use one generic message instead of revealing which credential was wrong.
       setError("Email or password is incorrect.");
       setIsSubmitting(false);
       return;
     }
 
+    // Honor the original destination only when it is safe and role-accessible.
     const nextPath = getSafeNextPath(searchParams.get("next"));
     const destination = nextPath && canAccessRoute(user, nextPath) ? nextPath : getPostLoginPath(user);
 
@@ -87,6 +93,7 @@ function LoginForm() {
 }
 
 export default function LoginPage() {
+  // useSearchParams requires a Suspense boundary in the Next.js App Router.
   return (
     <AuthLayout
       description="Use one shared login form for listeners, artists, support users, and admins."

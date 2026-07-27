@@ -9,6 +9,7 @@ import { useAuth } from "@/providers";
 import type { Notification } from "@/types/domain";
 
 function sortNotifications(items: Notification[]) {
+  // Clone before sorting so imported seed data is never mutated.
   return [...items].sort((first, second) => Date.parse(second.createdAt) - Date.parse(first.createdAt));
 }
 
@@ -17,6 +18,7 @@ export default function NotificationsPage() {
   const [userNotifications, setUserNotifications] = useState<Notification[]>([]);
 
   useEffect(() => {
+    // Build a private, newest-first inbox when the auth user becomes available.
     if (!currentUser) {
       return;
     }
@@ -24,12 +26,14 @@ export default function NotificationsPage() {
     setUserNotifications(sortNotifications(notifications.filter((notification) => notification.userId === currentUser.id)));
   }, [currentUser]);
 
+  // Memoize the derived badge/count until inbox state actually changes.
   const unreadCount = useMemo(
     () => userNotifications.filter((notification) => !notification.readAt).length,
     [userNotifications]
   );
 
   const markAsRead = (notificationId: string) => {
+    // Use one timestamp for the complete immutable state update.
     const readAt = new Date().toISOString();
 
     setUserNotifications((items) =>
@@ -47,6 +51,7 @@ export default function NotificationsPage() {
   const markAllAsRead = () => {
     const readAt = new Date().toISOString();
 
+    // Preserve existing read timestamps; stamp only unread records.
     setUserNotifications((items) =>
       items.map((notification) =>
         notification.readAt
@@ -60,6 +65,7 @@ export default function NotificationsPage() {
   };
 
   const deleteNotification = (notificationId: string) => {
+    // Deletion affects component state only and resets on a full page reload.
     setUserNotifications((items) => items.filter((notification) => notification.id !== notificationId));
   };
 
@@ -74,6 +80,7 @@ export default function NotificationsPage() {
         title="Notifications"
       />
       <section className="mt-6">
+        {/* Summary action disables itself when no work remains. */}
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-slate-400">
             {unreadCount} unread of {userNotifications.length} notifications
@@ -84,6 +91,7 @@ export default function NotificationsPage() {
         </div>
         <div className="space-y-3">
           {userNotifications.length === 0 ? (
+            /* Empty state appears both for users with no seeds and after deletes. */
             <EmptyState description="Notifications will appear here when available." title="No notifications" />
           ) : (
             userNotifications.map((notification) => (

@@ -11,22 +11,26 @@ import { tracks } from "@/data/tracks";
 import { formatNumber } from "@/lib/formatters";
 
 interface ArtistProfilePageProps {
+  // Dynamic route segment arrives as a promise in the current App Router API.
   params: Promise<{
     id: string;
   }>;
 }
 
 export default function ArtistProfilePage({ params }: ArtistProfilePageProps) {
+  // Unwrap route params, then resolve all normalized catalog relations.
   const { id } = use(params);
   const artist = artists.find((item) => item.id === id);
   const artistTracks = tracks.filter((track) => track.artistId === artist?.id);
   const artistAlbums = albums.filter((album) => album.artistId === artist?.id);
+  // Artist tracks become the playback context for popular-track cards.
   const queueTrackIds = artistTracks.map((track) => track.id);
 
   return (
     <MainAppLayout>
       {artist ? (
         <>
+          {/* Public profile hero handles optional banner/avatar art gracefully. */}
           <section className="overflow-hidden rounded-lg border border-surface-700 bg-surface-800">
             <div className="h-48 bg-surface-700">
               {artist.bannerImageUrl ? (
@@ -63,6 +67,7 @@ export default function ArtistProfilePage({ params }: ArtistProfilePageProps) {
           </section>
 
           <section className="mt-6 grid gap-4 md:grid-cols-3">
+            {/* Audience totals and genres summarize the artist at a glance. */}
             <Card>
               <p className="text-sm text-slate-400">Monthly listeners</p>
               <p className="mt-2 text-2xl font-semibold text-slate-50">{formatNumber(artist.monthlyListeners)}</p>
@@ -82,6 +87,7 @@ export default function ArtistProfilePage({ params }: ArtistProfilePageProps) {
           </section>
 
           <section className="mt-8">
+            {/* Selecting a track installs the complete artist track queue. */}
             <PageHeader
               description="Listen to the most important songs in this artist profile."
               title="Popular tracks"
@@ -99,6 +105,7 @@ export default function ArtistProfilePage({ params }: ArtistProfilePageProps) {
           </section>
 
           <section className="mt-8">
+            {/* Album links retain nested artist navigation inside AlbumCard. */}
             <h2 className="mb-4 text-xl font-bold text-slate-50">Albums</h2>
             {artistAlbums.length > 0 ? (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -114,6 +121,7 @@ export default function ArtistProfilePage({ params }: ArtistProfilePageProps) {
           </section>
         </>
       ) : (
+        /* Unknown route IDs show a stable empty state instead of throwing. */
         <EmptyState
           description="The requested artist does not exist in the mock catalog."
           title="Artist not found"

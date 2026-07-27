@@ -1,3 +1,4 @@
+// Component tests server-render React trees and assert important semantic output.
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const React = require("react");
@@ -12,9 +13,11 @@ const { getPlaylistStorageKey, readStoredPlaylists, writeStoredPlaylists } = req
 const { PlayerProvider } = require("@/providers/PlayerProvider");
 
 function render(element) {
+  // Static markup avoids a browser/JSDOM dependency for presentational checks.
   return renderToStaticMarkup(element);
 }
 
+// Primitive/shared smoke tests verify visible copy and styling contracts.
 test("renders a page header with title and description", () => {
   const html = render(
     React.createElement(PageHeader, {
@@ -85,6 +88,7 @@ test("renders table empty messages", () => {
 });
 
 test("renders track cards with artist links and play metadata", () => {
+  // TrackCard consumes player context even during static rendering.
   const track = tracks.find((item) => item.id === "track-neon-rain");
   const artist = artists.find((item) => item.id === track.artistId);
   const html = render(
@@ -113,6 +117,7 @@ test("renders album cards with album and artist names", () => {
   assert.match(html, /After Midnight cover/);
 });
 
+// Storage tests exercise both server fallback and a minimal fake browser store.
 test("reads fallback playlists when browser storage is unavailable", () => {
   const fallback = [{ id: "playlist-1", ownerId: "user-1", itemIds: [] }];
 
@@ -120,6 +125,7 @@ test("reads fallback playlists when browser storage is unavailable", () => {
 });
 
 test("writes and reads user-scoped playlists from local storage", () => {
+  // Map implements the subset of localStorage needed by the helper.
   const store = new Map();
   global.window = {
     localStorage: {
@@ -134,4 +140,5 @@ test("writes and reads user-scoped playlists from local storage", () => {
   assert.deepEqual(readStoredPlaylists("user-1", []), playlists);
   assert.equal(store.has(getPlaylistStorageKey("user-1")), true);
   delete global.window;
+  // Removing the fake prevents state leaking into later tests.
 });

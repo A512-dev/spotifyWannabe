@@ -10,18 +10,22 @@ import { useAuth } from "@/providers";
 import type { Gender } from "@/types";
 
 function getString(formData: FormData, name: string) {
+  // FormData values can be File objects; this helper returns trimmed text only.
   const value = formData.get(name);
 
   return typeof value === "string" ? value.trim() : "";
 }
 
 function validatePassword(password: string) {
+  // Phase 1 has one intentionally simple password rule.
   return password.length >= 6;
 }
 
 export default function SignupPage() {
   const router = useRouter();
   const { registerListener, submitArtistApplication } = useAuth();
+  // Listener and artist flows keep independent feedback so switching tabs does
+  // not accidentally display a message from the other workflow.
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [acceptedPrivacyPolicy, setAcceptedPrivacyPolicy] = useState(false);
   const [listenerError, setListenerError] = useState("");
@@ -32,6 +36,7 @@ export default function SignupPage() {
     event.preventDefault();
     setListenerError("");
 
+    // Extract the uncontrolled form in one snapshot at submit time.
     const formData = new FormData(event.currentTarget);
     const displayName = getString(formData, "displayName");
     const email = getString(formData, "email");
@@ -41,6 +46,7 @@ export default function SignupPage() {
     const gender = getString(formData, "gender") as Gender;
 
     if (!displayName || !email || !password || !confirmPassword || !birthDate || !gender) {
+      // This duplicates native required checks as a defensive business guard.
       setListenerError("Please fill in all required fields.");
       return;
     }
@@ -56,6 +62,7 @@ export default function SignupPage() {
     }
 
     if (!acceptedPrivacyPolicy) {
+      // The policy checkbox is controlled because it also opens a modal.
       setListenerError("You must accept the privacy policy before creating an account.");
       return;
     }
@@ -69,10 +76,12 @@ export default function SignupPage() {
     });
 
     if (!result.ok) {
+      // Provider-level errors include duplicate email/account failures.
       setListenerError(result.error ?? "Could not create the account.");
       return;
     }
 
+    // Listener registration also signs the new user in, so home is immediately valid.
     router.push("/");
   };
 
@@ -81,6 +90,7 @@ export default function SignupPage() {
     setArtistError("");
     setArtistSuccess("");
 
+    // Artist submission creates an approval request, not an authenticated account.
     const formData = new FormData(event.currentTarget);
     const email = getString(formData, "artistEmail");
     const password = getString(formData, "artistPassword");
@@ -110,6 +120,7 @@ export default function SignupPage() {
     }
 
     event.currentTarget.reset();
+    // Keep the user on the form and confirm the pending workflow state.
     setArtistSuccess(`${result.data.stageName} is now in pending approval status.`);
   };
 
@@ -118,6 +129,7 @@ export default function SignupPage() {
       description="Create a listener account or submit an artist application for review."
       title="Create account"
     >
+      {/* Tabs separate immediate listener registration from reviewed artist signup. */}
       <Tabs
         tabs={[
           {
@@ -225,6 +237,7 @@ export default function SignupPage() {
       </p>
 
       <Modal onClose={() => setPrivacyOpen(false)} open={privacyOpen} title="Privacy policy">
+        {/* Copy explicitly distinguishes browser-only mock storage from production. */}
         <div className="space-y-3 text-sm text-slate-300">
           <p>
             SoundWave uses your account information to create your profile, protect access to your account, and
