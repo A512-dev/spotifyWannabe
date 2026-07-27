@@ -1,3 +1,4 @@
+/** Precomputed profile metrics shown by StatCard components. */
 export interface UserProfileStats {
   userId: string;
   followerCount: number;
@@ -5,6 +6,7 @@ export interface UserProfileStats {
   dailyStreamCount: number;
 }
 
+// Every seeded account has a row, including operational users with little activity.
 export const profileStats: UserProfileStats[] = [
   {
     userId: "user-listener-1",
@@ -39,6 +41,7 @@ export const profileStats: UserProfileStats[] = [
 ];
 
 export function getProfileStats(userId: string): UserProfileStats {
+  // Unknown/newly registered users receive a safe zero-filled view.
   return (
     profileStats.find((item) => item.userId === userId) ?? {
       userId,

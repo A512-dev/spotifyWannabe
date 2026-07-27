@@ -1,5 +1,6 @@
 import type { Ticket, TicketMessage } from "@/types/domain";
 
+// Ticket headers seed different priorities and workflow states for support filters.
 export const tickets: Ticket[] = [
   {
     id: "ticket-1001",
@@ -23,6 +24,8 @@ export const tickets: Ticket[] = [
   }
 ];
 
+// Messages are stored separately to model a one-to-many ticket conversation.
+// One seed is a requester reply; the other is a staff-only internal note.
 export const ticketMessages: TicketMessage[] = [
   {
     id: "ticket-message-1",
@@ -41,4 +44,3 @@ export const ticketMessages: TicketMessage[] = [
     createdAt: "2026-06-22T08:45:00.000Z"
   }
 ];
-

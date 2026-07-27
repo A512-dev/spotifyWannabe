@@ -1,5 +1,6 @@
 import type { ArtistApprovalRequest } from "@/types/domain";
 
+// One pending and one completed request exercise both actionable and audit views.
 export const artistApprovalRequests: ArtistApprovalRequest[] = [
   {
     id: "artist-approval-1",
@@ -19,4 +20,3 @@ export const artistApprovalRequests: ArtistApprovalRequest[] = [
     reviewNote: "Strong profile and verified release metadata."
   }
 ];
-

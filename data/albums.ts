@@ -1,5 +1,7 @@
 import type { Album } from "@/types/domain";
 
+// Album records reference artist and track IDs instead of duplicating those
+// objects. The ordering of trackIds is also the intended playback order.
 export const albums: Album[] = [
   {
     id: "album-after-midnight",

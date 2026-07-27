@@ -1,6 +1,7 @@
 import type { NavigationItem } from "@/types/navigation";
 
-// Main sidebar navigation is intentionally centralized so access and layout changes are easy to audit.
+// Main product destinations. Sidebar filters this list against the current role,
+// so adding a route here does not expose it to every account automatically.
 export const SIDEBAR_NAVIGATION: NavigationItem[] = [
   {
     label: "Home",
@@ -40,6 +41,7 @@ export const SIDEBAR_NAVIGATION: NavigationItem[] = [
   }
 ];
 
+// Secondary account links rendered in the authenticated top bar.
 export const ACCOUNT_NAVIGATION: NavigationItem[] = [
   {
     label: "Profile",
@@ -58,6 +60,7 @@ export const ACCOUNT_NAVIGATION: NavigationItem[] = [
   }
 ];
 
+// Public authentication destinations, ready for any shared auth navigation.
 export const AUTH_NAVIGATION: NavigationItem[] = [
   {
     label: "Login",
@@ -70,4 +73,3 @@ export const AUTH_NAVIGATION: NavigationItem[] = [
     allowedRoles: ["listener", "artist", "support", "admin"]
   }
 ];
-

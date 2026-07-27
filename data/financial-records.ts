@@ -1,5 +1,7 @@
 import type { ArtistRevenueRecord } from "@/types/domain";
 
+// Monthly payout examples feed artist revenue and admin accounting summaries.
+// All monetary values are integer cents; net equals gross minus platform fee.
 export const artistRevenueRecords: ArtistRevenueRecord[] = [
   {
     id: "revenue-lina-2026-05",
@@ -24,4 +26,3 @@ export const artistRevenueRecords: ArtistRevenueRecord[] = [
     currency: "USD"
   }
 ];
-

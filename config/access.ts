@@ -1,7 +1,7 @@
 import type { RouteAccessRule, SubscriptionFeatureRule } from "@/types/navigation";
 
-// Phase 1 keeps route access rules centralized so layouts, future middleware,
-// and backend integration can reuse the same role contracts.
+// Protected prefixes are centralized so the client layout, future middleware,
+// and a backend can share one role policy. Unlisted paths have no role restriction.
 export const ROUTE_ACCESS_RULES: RouteAccessRule[] = [
   {
     path: "/artist-dashboard",
@@ -21,11 +21,12 @@ export const ROUTE_ACCESS_RULES: RouteAccessRule[] = [
   }
 ];
 
-// Playlist limits follow the project PDF:
-// Basic = 6 playlists, Silver = 100 playlists, Gold = unlimited.
+// JavaScript's Infinity is the numeric "unlimited" sentinel. Comparisons such as
+// `currentCount < limit` therefore work without a separate gold-tier branch.
 export const UNLIMITED_PLAYLIST_LIMIT = Number.POSITIVE_INFINITY;
 
-// Subscription rules keep product limits and premium permissions out of page components.
+// Product entitlements live in configuration rather than being scattered across
+// JSX. Pages should query them through the helpers in lib/subscription.ts.
 export const SUBSCRIPTION_FEATURE_RULES: SubscriptionFeatureRule[] = [
   {
     tier: "basic",

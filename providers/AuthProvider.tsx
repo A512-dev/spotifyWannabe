@@ -8,18 +8,22 @@ import { users as mockedUsers } from "@/data/users";
 import { authenticateUser, findUserByEmail, normalizeEmail } from "@/lib/auth";
 import type { ApprovalStatus, Gender, User } from "@/types/domain";
 
+// Browser storage is split by concern so updating a profile does not rewrite
+// credentials or pending artist applications.
 const CURRENT_USER_STORAGE_KEY = "soundwave.currentUser";
 const USERS_STORAGE_KEY = "soundwave.users";
 const CREDENTIALS_STORAGE_KEY = "soundwave.credentials";
 const ARTIST_APPLICATIONS_STORAGE_KEY = "soundwave.artistApplications";
 
 interface AuthActionResult<T> {
+  /** Explicit result avoids throwing for expected validation/business failures. */
   ok: boolean;
   data?: T;
   error?: string;
 }
 
 interface ListenerRegistrationInput {
+  // Only fields accepted by the Phase 1 listener signup form belong here.
   displayName: string;
   email: string;
   password: string;
@@ -28,6 +32,7 @@ interface ListenerRegistrationInput {
 }
 
 interface ArtistApplicationInput {
+  // Artist applications do not create a User until staff approves them.
   email: string;
   password: string;
   stageName: string;
@@ -35,6 +40,7 @@ interface ArtistApplicationInput {
 }
 
 interface UserProfileUpdateInput {
+  // Every field is optional so one form can submit only editable values.
   avatarUrl?: string;
   birthDate?: string;
   displayName?: string;
@@ -42,6 +48,7 @@ interface UserProfileUpdateInput {
 }
 
 export interface ArtistApplication {
+  // Local-only application shape; operational seed approvals use a domain type.
   id: string;
   email: string;
   stageName: string;
@@ -51,6 +58,7 @@ export interface ArtistApplication {
 }
 
 interface AuthContextValue {
+  // State plus all supported auth/account commands exposed to client pages.
   artistApplications: ArtistApplication[];
   currentUser: User | null;
   deleteCurrentUser: () => AuthActionResult<null>;
@@ -64,10 +72,17 @@ interface AuthContextValue {
   updateCurrentUser: (input: UserProfileUpdateInput) => AuthActionResult<User>;
 }
 
+// Undefined enables useAuth to detect components rendered outside AppProviders.
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+/**
+ * Safely reads one JSON value from localStorage.
+ * Server rendering and missing/corrupt values use the caller's deterministic
+ * fallback so storage problems cannot crash the application shell.
+ */
 function readStoredValue<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") {
+    // `window` is absent during Next.js server rendering.
     return fallback;
   }
 
@@ -80,32 +95,42 @@ function readStoredValue<T>(key: string, fallback: T): T {
   try {
     return JSON.parse(storedValue) as T;
   } catch {
+    // Phase 1 trusts valid JSON shapes but recovers from malformed JSON.
     return fallback;
   }
 }
 
+/** Serializes a complete value under one of this provider's storage keys. */
 function writeStoredValue<T>(key: string, value: T) {
   window.localStorage.setItem(key, JSON.stringify(value));
 }
 
+/** Produces collision-resistant-enough IDs for single-browser mock records. */
 function createId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/** Creates a readable, URL-safe username with a short uniqueness suffix. */
 function createUsername(displayName: string, email: string) {
+  // Prefer the display name, then the email local-part, then a safe fallback.
   const source = displayName.trim() || email.split("@")[0] || "listener";
   const slug = source.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
+  // The suffix prevents two users with the same display name from matching.
   return `${slug || "listener"}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  // Seed arrays are initial render values; the mount effect replaces them with
+  // any browser-persisted values once localStorage becomes available.
   const [authUsers, setAuthUsers] = useState<User[]>(mockedUsers);
   const [credentials, setCredentials] = useState<AuthCredential[]>(mockCredentials);
   const [artistApplications, setArtistApplications] = useState<ArtistApplication[]>([]);
   const [currentUser, setCurrentUserState] = useState<User | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
 
+  // Hydrate all auth-related stores exactly once on the client. isAuthReady keeps
+  // route guards from redirecting before the saved session has been restored.
   useEffect(() => {
     setAuthUsers(readStoredValue(USERS_STORAGE_KEY, mockedUsers));
     setCredentials(readStoredValue(CREDENTIALS_STORAGE_KEY, mockCredentials));
@@ -115,11 +140,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setCurrentUser = useCallback((user: User | null) => {
+    // Keep React state and the durable mock session in sync.
     setCurrentUserState(user);
 
     if (user) {
       writeStoredValue(CURRENT_USER_STORAGE_KEY, user);
     } else {
+      // Logging out removes only the session, not the account or credentials.
       window.localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
     }
   }, []);
@@ -129,6 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const user = authenticateUser(email, password, authUsers, credentials);
 
       if (user) {
+        // Successful login immediately persists/restores the active session.
         setCurrentUser(user);
       }
 
@@ -142,6 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [setCurrentUser]);
 
   const deleteCurrentUser = useCallback((): AuthActionResult<null> => {
+    // Deletion requires a signed-in target; this also protects against stale UI.
     if (!currentUser) {
       return {
         ok: false,
@@ -150,6 +179,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const normalizedEmail = normalizeEmail(currentUser.email);
+    // Remove both the public profile and its matching login credential.
     const nextUsers = authUsers.filter((user) => user.id !== currentUser.id);
     const nextCredentials = credentials.filter((credential) => normalizeEmail(credential.email) !== normalizedEmail);
 
@@ -175,12 +205,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const nextUser: User = {
+        // Input wins over existing editable fields; activity time is always fresh.
         ...currentUser,
         ...input,
         lastActiveAt: new Date().toISOString()
       };
       const nextUsers = authUsers.map((user) => (user.id === nextUser.id ? nextUser : user));
 
+      // Update the account collection before replacing the active session snapshot.
       setAuthUsers(nextUsers);
       writeStoredValue(USERS_STORAGE_KEY, nextUsers);
       setCurrentUser(nextUser);
@@ -197,6 +229,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (input: ListenerRegistrationInput): AuthActionResult<User> => {
       const normalizedEmail = normalizeEmail(input.email);
 
+      // Email is the unique account identity in this mock system.
       if (findUserByEmail(authUsers, normalizedEmail)) {
         return {
           ok: false,
@@ -205,6 +238,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const now = new Date().toISOString();
+      // New listeners always begin on Basic and unverified.
       const user: User = {
         id: createId("user-listener"),
         username: createUsername(input.displayName, normalizedEmail),
@@ -221,6 +255,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const nextUsers = [...authUsers, user];
       const nextCredentials = [...credentials, { email: normalizedEmail, password: input.password }];
 
+      // Persist the new account, its credential, and a logged-in session.
       setAuthUsers(nextUsers);
       setCredentials(nextCredentials);
       writeStoredValue(USERS_STORAGE_KEY, nextUsers);
@@ -239,6 +274,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (input: ArtistApplicationInput): AuthActionResult<ArtistApplication> => {
       const normalizedEmail = normalizeEmail(input.email);
 
+      // Existing account emails cannot enter the separate application pipeline.
       if (findUserByEmail(authUsers, normalizedEmail)) {
         return {
           ok: false,
@@ -256,6 +292,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
       const nextApplications = [...artistApplications, application];
 
+      // Submission does not log the applicant in or create a user record.
       setArtistApplications(nextApplications);
       writeStoredValue(ARTIST_APPLICATIONS_STORAGE_KEY, nextApplications);
 
@@ -268,6 +305,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const requestPasswordReset = useCallback((email: string): AuthActionResult<null> => {
+    // Phase 1 only validates presence. Its generic success response avoids
+    // revealing whether an email belongs to an account.
     if (!normalizeEmail(email)) {
       return {
         ok: false,
@@ -282,6 +321,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
+    // Memoization keeps the context reference stable until state/action changes.
     () => ({
       artistApplications,
       currentUser,
@@ -317,6 +357,7 @@ export function useAuth() {
   const context = useContext(AuthContext);
 
   if (!context) {
+    // Enforce the provider boundary with an immediately actionable error.
     throw new Error("useAuth must be used inside AuthProvider.");
   }
 

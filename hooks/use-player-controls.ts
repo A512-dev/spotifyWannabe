@@ -1,6 +1,7 @@
 import { usePlayer } from "@/providers/PlayerProvider";
 
-// Player feature work can grow this hook later. For Phase 1 it exposes shell state only.
+// Stable feature-facing hook. It currently exposes raw player context and can
+// later grow named playback actions without changing imports throughout the app.
 export function usePlayerControls() {
   return usePlayer();
 }

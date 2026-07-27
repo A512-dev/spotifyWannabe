@@ -1,5 +1,7 @@
 import type { Track } from "@/types/domain";
 
+// Central catalog used by browse pages, playlists, artist views, and the player.
+// All demo tracks reuse one bundled audio file to keep the repository lightweight.
 export const tracks: Track[] = [
   {
     id: "track-neon-rain",
@@ -12,7 +14,7 @@ export const tracks: Track[] = [
     playCount: 582100,
     explicit: false,
     releaseDate: "2026-02-14T00:00:00.000Z",
-    // اضافه شدن متن آهنگ برای تست پلیر جدید
+    // Multiline sample lyrics exercise both desktop and mobile lyric panels.
     lyrics: `[Verse 1]
 Walking through the crowded streets tonight
 Underneath the purple neon light

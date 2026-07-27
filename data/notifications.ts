@@ -1,5 +1,8 @@
 import type { Notification } from "@/types/domain";
 
+// Notification seeds cover each role, category, read state, and deep-link action.
+// The notifications page copies the signed-in user's subset into local component
+// state, so mark-read/delete actions do not mutate this shared module constant.
 export const notifications: Notification[] = [
   {
     id: "notification-listener-subscription",

@@ -1,3 +1,4 @@
+// Barrel entry point for consumers that need several mock-data collections.
 export * from "@/data/albums";
 export * from "@/data/artist-approval-requests";
 export * from "@/data/artists";

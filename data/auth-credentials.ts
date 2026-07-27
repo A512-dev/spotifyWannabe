@@ -1,10 +1,12 @@
+/** Minimal credential shape used only by the mock authentication layer. */
 export interface AuthCredential {
   email: string;
   password: string;
 }
 
-// Mock credentials are separate from User records because passwords are auth data, not profile data.
-// A real backend would replace this file with a login endpoint and hashed password storage.
+// Credentials are deliberately separate from profile records because passwords
+// are authentication data, not public user data. These plain-text examples are
+// for local demonstration only; a real backend must store salted password hashes.
 export const mockCredentials: AuthCredential[] = [
   {
     email: "maya.listener@example.com",

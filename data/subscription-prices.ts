@@ -1,8 +1,9 @@
 import { UNLIMITED_PLAYLIST_LIMIT } from "@/config/access";
 import type { SubscriptionPrice } from "@/types/domain";
 
-// Phase 1 mock prices. The admin dashboard can update Silver and Gold prices locally.
-// Phase 2 should persist these values in the backend so pricing changes never require code changes.
+// Phase 1 seed prices. The admin dashboard copies and edits Silver/Gold amounts
+// locally. A backend should eventually own pricing so changes are durable and
+// cannot be manipulated as client-side state.
 export const subscriptionPrices: SubscriptionPrice[] = [
   {
     tier: "basic",

@@ -1,7 +1,9 @@
 import type { User } from "@/types/domain";
 
-// Mock users intentionally cover every role and subscription tier.
+// Seed accounts intentionally cover every role and subscription tier so role
+// guards, navigation, premium gates, and operational dashboards can be exercised.
 export const users: User[] = [
+  // Gold listener: default rich listener scenario and first README login example.
   {
     id: "user-listener-1",
     username: "maya-stone-01",
@@ -14,6 +16,7 @@ export const users: User[] = [
     lastActiveAt: "2026-06-25T12:30:00.000Z",
     isEmailVerified: true
   },
+  // Basic listener: demonstrates verification and subscription restrictions.
   {
     id: "user-listener-2",
     username: "noah-reed-02",
@@ -26,6 +29,7 @@ export const users: User[] = [
     lastActiveAt: "2026-06-20T14:20:00.000Z",
     isEmailVerified: false
   },
+  // Approved artist account linked to the Lina public artist profile.
   {
     id: "user-artist-1",
     username: "lina-torres-artist",
@@ -39,6 +43,7 @@ export const users: User[] = [
     lastActiveAt: "2026-06-24T17:45:00.000Z",
     isEmailVerified: true
   },
+  // Staff account used for the support ticket and approval workspace.
   {
     id: "user-support-1",
     username: "samir-patel-support",
@@ -51,6 +56,7 @@ export const users: User[] = [
     lastActiveAt: "2026-06-26T07:15:00.000Z",
     isEmailVerified: true
   },
+  // Administrator account with access to all protected operational routes.
   {
     id: "user-admin-1",
     username: "elena-park-admin",

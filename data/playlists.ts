@@ -1,5 +1,7 @@
 import type { Playlist, PlaylistItem } from "@/types/domain";
 
+// Normalized membership examples retain audit/order information for a future
+// backend even though the Phase 1 page mainly reads Playlist.itemIds.
 export const playlistItems: PlaylistItem[] = [
   {
     id: "playlist-item-1",
@@ -27,6 +29,8 @@ export const playlistItems: PlaylistItem[] = [
   }
 ];
 
+// Seed playlists are filtered by owner before becoming a signed-in user's local
+// state. Later edits are written to that user's localStorage namespace.
 export const playlists: Playlist[] = [
   {
     id: "playlist-focus",

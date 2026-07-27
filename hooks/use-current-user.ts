@@ -1,7 +1,7 @@
 import { useAuth } from "@/providers/AuthProvider";
 
-// Small hook wrapper gives feature teams a stable import if auth internals change.
+// Stable feature-facing hook: callers need not know which provider or auth
+// implementation supplies the current account.
 export function useCurrentUser() {
   return useAuth().currentUser;
 }
-

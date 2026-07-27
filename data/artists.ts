@@ -1,6 +1,8 @@
 import type { ArtistProfile } from "@/types/domain";
 
+// Public artist seed records cover both sides of the approval workflow.
 export const artists: ArtistProfile[] = [
+  // Approved, established artist with complete imagery and catalog data.
   {
     id: "artist-lina",
     userId: "user-artist-1",
@@ -14,6 +16,7 @@ export const artists: ArtistProfile[] = [
     profileImageUrl: "/mock/artists/lina-profile.png",
     bannerImageUrl: "/mock/artists/lina-banner.png"
   },
+  // Pending artist used by support/admin approval queues and empty-album states.
   {
     id: "artist-orbit",
     userId: "user-listener-2",
