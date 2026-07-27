@@ -2,6 +2,10 @@
 
 SoundWave is a Phase 1 frontend foundation for a Spotify-like streaming app built with Next.js App Router, React, TypeScript, and Tailwind CSS. This repository intentionally focuses on shared architecture, typed contracts, mock data, reusable UI, layouts, providers, and route skeletons instead of full business-page implementation.
 
+## Detailed Codebase Guide
+
+Read [`CODEBASE_REPORT.md`](./CODEBASE_REPORT.md) for a 45–60 minute walkthrough of every folder, every file, each major code block, data flow, persistence behavior, limitations, and recommended next steps.
+
 ## Architecture
 
 The project is organized so three developers can work asynchronously with minimal file conflicts:
