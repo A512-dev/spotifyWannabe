@@ -1,5 +1,13 @@
-from django.urls import path
+from django.urls import include, path
+from rest_framework.routers import DefaultRouter
+
+from support.views import TicketViewSet
 
 app_name = "support"
 
-urlpatterns = []
+router = DefaultRouter()
+router.register("tickets", TicketViewSet, basename="ticket")
+
+urlpatterns = [
+    path("", include(router.urls)),
+]
