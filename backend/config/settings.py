@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "common",
     "artists",
     "support",
+    "operations.apps.OperationsConfig",
     "reports",
 ]
 
