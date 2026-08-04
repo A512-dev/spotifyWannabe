@@ -6,11 +6,12 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from artists.models import ArtistApplication, ArtistApplicationStatus
+from artists.models import ArtistApplication, ArtistApplicationStatus, ArtistProfile
 from artists.serializers import (
     ArtistApplicationCreateSerializer,
     ArtistApplicationReviewSerializer,
     ArtistApplicationSerializer,
+    ArtistProfileSerializer,
 )
 from artists.services import review_artist_application
 from common.permissions import IsSupportOrAdministrator
@@ -73,3 +74,23 @@ class ArtistApplicationViewSet(
             context=self.get_serializer_context(),
         )
         return Response(output_serializer.data, status=status.HTTP_200_OK)
+
+
+class ArtistProfileViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    viewsets.GenericViewSet,
+):
+    serializer_class = ArtistProfileSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ["stage_name", "bio", "genre_tags"]
+    ordering_fields = ["stage_name", "verified_at", "created_at"]
+    ordering = ["stage_name"]
+
+    def get_queryset(self):
+        return (
+            ArtistProfile.objects.filter(is_approved=True)
+            .select_related("user", "verified_by")
+            .prefetch_related("tracks", "albums")
+        )
