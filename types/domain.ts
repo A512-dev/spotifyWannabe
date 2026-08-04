@@ -29,13 +29,17 @@ export interface User {
   email: string;
   role: UserRole;
   subscriptionTier: SubscriptionTier;
-  birthDate?: ISODateString;
+  birthDate?: ISODateString | null;
   gender?: Gender;
-  avatarUrl?: string;
-  artistProfileId?: string;
+  avatarUrl?: string | null;
+  artistProfileId?: string | null;
   createdAt: ISODateString;
-  lastActiveAt: ISODateString;
+  lastActiveAt: ISODateString | null;
   isEmailVerified: boolean;
+  followerCount?: number;
+  followingCount?: number;
+  dailyStreamCount?: number;
+  isFollowing?: boolean;
 }
 
 export interface ArtistProfile {
@@ -56,23 +60,37 @@ export interface Track {
   id: string;
   title: string;
   artistId: string;
+  artistName?: string;
   albumId?: string;
+  albumTitle?: string;
   durationSeconds: number;
   audioUrl: string;
   coverImageUrl?: string;
-  playCount: number;
+  playCount?: number;
+  uniqueListeners?: number;
   explicit: boolean;
   releaseDate: ISODateString;
   lyrics?: string;
+  genreId?: number | null;
+  trackNumber?: number;
+  status?: "draft" | "published";
+  isEarlyAccess?: boolean;
+  collaboratorIds?: string[];
 }
 
 export interface Album {
   id: string;
   title: string;
   artistId: string;
+  artistName?: string;
   coverImageUrl?: string;
   releaseDate: ISODateString;
   trackIds: string[];
+  tracks?: Track[];
+  genreId?: number | null;
+  status?: "draft" | "published";
+  isEarlyAccess?: boolean;
+  listenerCount?: number;
 }
 
 export interface PlaylistItem {
