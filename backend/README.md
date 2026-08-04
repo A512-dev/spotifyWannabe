@@ -1,25 +1,116 @@
 # SoundWave Backend
 
-Django REST Framework backend for Phase 2 of the SoundWave project.
+Django REST Framework backend for Phase 2 of SoundWave.
 
-## Local setup
+## Application Ownership
+
+| Application | Main responsibility |
+|---|---|
+| `accounts` | Registration, login/logout, profiles, preferences, follows |
+| `artists` | Artist applications, samples, approval, rejection, artist profiles |
+| `music` | Genres, tracks, albums, uploads, streams, listening history |
+| `playlists` | Playlist CRUD, ownership, ordering, subscription limits |
+| `subscriptions` | Payment transactions, activation, renewal, expiry |
+| `notifications` | Persistent notifications and read/delete actions |
+| `support` | Tickets, replies, internal notes, assignment, status transitions |
+| `operations` | Dynamic subscription plans and price audit history |
+| `reports` | Aggregated reports, artist accounting, settlements |
+| `common` | Health check, permissions, pagination, shared exceptions |
+
+## Local Setup
+
+From the repository root:
 
 ```powershell
+py -m venv .\backend\.venv
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+. .\backend\.venv\Scripts\Activate.ps1
+python -m pip install -r .\backend\requirements.txt
+
+if (!(Test-Path .\backend\.env)) {
+    Copy-Item .\backend\.env.example .\backend\.env
+}
+
 cd backend
-py -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
-Copy-Item .env.example .env
-python manage.py makemigrations accounts notifications subscriptions music playlists
 python manage.py migrate
-python manage.py test
-python manage.py runserver
+python manage.py check
 ```
 
-The default database is SQLite. Set the PostgreSQL variables in `.env` to use PostgreSQL.
-The default payment gateway is the deterministic local sandbox.
+The committed migrations are sufficient for normal setup. Verify model and migration consistency with:
 
-## API prefixes
+```powershell
+python manage.py makemigrations --check --dry-run
+```
+
+Expected output:
+
+```text
+No changes detected
+```
+
+## Running the Backend
+
+```powershell
+python manage.py runserver 127.0.0.1:8000
+```
+
+Health check:
+
+```text
+http://127.0.0.1:8000/api/health/
+```
+
+Django administration:
+
+```text
+http://127.0.0.1:8000/admin/
+```
+
+## Tests
+
+```powershell
+python manage.py check
+python manage.py test -v 2
+```
+
+Validated result on the Phase 2 branch:
+
+```text
+Found 108 test(s).
+...
+OK
+```
+
+## Environment
+
+The default local database is SQLite. PostgreSQL can be enabled through the variables in `.env`.
+
+The default payment gateway is:
+
+```text
+PAYMENT_GATEWAY=local
+```
+
+Uploaded files are stored under:
+
+```text
+backend/media/
+```
+
+When `DEBUG=true`, Django serves local media files during development.
+
+## Authentication and Roles
+
+DRF token authentication is used by the frontend API client.
+
+- Django superuser: administrator
+- User in the `support` group: support agent
+- User with an approved artist profile: artist
+- Other authenticated user: listener
+
+Backend permissions enforce both role-based and subscription-based restrictions.
+
+## API Prefixes
 
 - `/api/accounts/`
 - `/api/artists/`
@@ -31,4 +122,18 @@ The default payment gateway is the deterministic local sandbox.
 - `/api/reports/`
 - `/api/operations/`
 
-Run `python manage.py process_subscription_expiry` periodically to expire ended subscriptions and create seven-day warnings.
+## Subscription Processing
+
+Run periodically:
+
+```powershell
+python manage.py process_subscription_expiry
+```
+
+This command expires ended subscriptions and creates seven-day warning notifications.
+
+## Reports and Accounting
+
+Aggregated values are calculated in the backend. The frontend receives prepared totals and counts instead of raw lists.
+
+Artist revenue records can be generated from counted stream events, viewed by the relevant roles, and marked as settled only by the administrator.
