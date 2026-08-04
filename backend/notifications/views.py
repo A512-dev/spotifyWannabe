@@ -20,6 +20,9 @@ class NotificationViewSet(
     http_method_names = ["get", "post", "delete", "head", "options"]
 
     def get_queryset(self):
+        from subscriptions.services import process_subscription_lifecycle
+
+        process_subscription_lifecycle(user=self.request.user)
         queryset = Notification.objects.filter(recipient=self.request.user)
         unread = self.request.query_params.get("unread")
         if unread == "true":

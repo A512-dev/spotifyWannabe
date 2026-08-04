@@ -13,6 +13,7 @@ from rest_framework.exceptions import AuthenticationFailed, ValidationError
 
 from accounts.models import UserProfile
 from artists.models import ArtistApplication, ArtistSampleWork
+from artists.signals import artist_application_submitted
 from artists.serializers import ALLOWED_SAMPLE_EXTENSIONS, MAX_SAMPLE_FILE_SIZE
 
 User = get_user_model()
@@ -47,11 +48,14 @@ def register_listener(*, display_name: str, email: str, password: str, birth_dat
     validate_new_password(password, user=user)
     user.set_password(password)
     user.save()
-    UserProfile.objects.filter(user=user).update(
-        display_name=display_name.strip(),
-        birth_date=birth_date,
-        gender=gender,
-    )
+    # The post-save receiver has already created and cached this one-to-one
+    # profile on ``user``. Mutating that instance keeps the immediate
+    # registration response consistent with later profile reads.
+    profile = user.profile
+    profile.display_name = display_name.strip()
+    profile.birth_date = birth_date
+    profile.gender = gender
+    profile.save(update_fields=["display_name", "birth_date", "gender", "updated_at"])
     listener_group, _ = Group.objects.get_or_create(name="listener")
     user.groups.add(listener_group)
     return user
@@ -104,6 +108,14 @@ def register_artist(
             file=None,
             external_url=sample_url,
         )
+    transaction.on_commit(
+        lambda: artist_application_submitted.send(
+            sender=ArtistApplication,
+            application_id=application.pk,
+            applicant_id=user.pk,
+            stage_name=application.stage_name,
+        )
+    )
     return user, application
 
 

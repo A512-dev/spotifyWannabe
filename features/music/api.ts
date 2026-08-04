@@ -17,8 +17,14 @@ export interface HomeResponse {
   latestTracks: Track[];
   trendingTracks: Track[];
   earlyAccessTracks: Track[];
+  recommendedTracks: RecommendationEntry[];
   recentlyPlayed: ListeningHistoryEntry[];
   recentlyPlayedPlaylists: PlaylistPlaybackEntry[];
+}
+
+export interface RecommendationEntry {
+  track: Track;
+  reason: string;
 }
 
 export interface PlaylistWithItems extends Playlist {

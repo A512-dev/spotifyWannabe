@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "node --require ./tests/setup.cjs --test tests/helpers.test.cjs tests/components.test.cjs",
+    "test": "node --require ./tests/setup.cjs --test tests/helpers.test.cjs tests/components.test.cjs tests/api-integration.test.cjs",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {

@@ -3,15 +3,26 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date
 
+from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.db.models import Count, QuerySet, Sum
+from django.db.models import CharField, Count, OuterRef, QuerySet, Subquery, Sum, Value
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from artists.models import ArtistApplication, ArtistApplicationStatus, ArtistProfile
+from operations.models import SubscriptionTier
 from reports.models import ArtistRevenueRecord, PaymentStatus
 from reports.signals import artist_revenue_record_created, artist_revenue_record_settled
+from subscriptions.models import (
+    PaymentStatus as SubscriptionPaymentStatus,
+    PaymentTransaction,
+    SubscriptionStatus,
+    UserSubscription,
+)
 from support.models import Ticket, TicketPriority, TicketStatus
+
+User = get_user_model()
 
 
 def filter_records_for_period(
@@ -153,18 +164,24 @@ def build_artist_overview(
         period_end=period_end,
     )
     totals = queryset.aggregate(
-        unique_listeners=Sum("unique_listener_count"),
         streams=Sum("stream_count"),
         pending_payments=Count("id", filter=models_q(payment_status=PaymentStatus.PENDING)),
         settled_payments=Count("id", filter=models_q(payment_status=PaymentStatus.SETTLED)),
     )
+    from music.models import StreamEvent
+
+    unique_listeners = StreamEvent.objects.filter(
+        track__artist=artist,
+        counted=True,
+        streamed_on__range=(period_start, period_end),
+    ).values("listener_id").distinct().count()
     return {
         "periodStart": period_start,
         "periodEnd": period_end,
         "artistId": str(artist.pk),
         "artistName": artist.stage_name,
         "recordCount": queryset.count(),
-        "uniqueListeners": totals["unique_listeners"] or 0,
+        "uniqueListeners": unique_listeners,
         "streams": totals["streams"] or 0,
         "pendingPayments": totals["pending_payments"] or 0,
         "settledPayments": totals["settled_payments"] or 0,
@@ -257,6 +274,70 @@ def build_support_overview() -> dict:
     }
 
 
+def build_subscription_distribution() -> dict[str, int]:
+    """Aggregate current listener subscription tiers entirely in the backend."""
+    now = timezone.now()
+    current_tier = UserSubscription.objects.filter(
+        user_id=OuterRef("pk"),
+        status=SubscriptionStatus.ACTIVE,
+        starts_at__lte=now,
+        ends_at__gt=now,
+    ).order_by("-ends_at").values("plan__tier")[:1]
+    eligible_users = (
+        User.objects.filter(is_active=True, is_superuser=False)
+        .exclude(groups__name="support")
+        .annotate(
+            current_subscription_tier=Coalesce(
+                Subquery(current_tier, output_field=CharField()),
+                Value(SubscriptionTier.BASIC),
+            )
+        )
+    )
+    distribution = {tier: 0 for tier in SubscriptionTier.values}
+    for row in eligible_users.values("current_subscription_tier").annotate(total=Count("id")):
+        tier = row["current_subscription_tier"]
+        if tier in distribution:
+            distribution[tier] = row["total"]
+    distribution["total"] = sum(distribution.values())
+    return distribution
+
+
+def build_subscription_sales(*, period_start: date, period_end: date) -> dict:
+    queryset = PaymentTransaction.objects.filter(
+        status=SubscriptionPaymentStatus.SUCCESS,
+        verified_at__date__range=(period_start, period_end),
+    )
+    currency_rows = (
+        queryset.values("currency")
+        .annotate(revenue_cents=Sum("amount_cents"), transaction_count=Count("id"))
+        .order_by("currency")
+    )
+    tier_rows = (
+        queryset.values("plan__tier")
+        .annotate(revenue_cents=Sum("amount_cents"), transaction_count=Count("id"))
+        .order_by("plan__tier")
+    )
+    return {
+        "transactionCount": queryset.count(),
+        "currencyBreakdown": [
+            {
+                "currency": row["currency"],
+                "revenueCents": row["revenue_cents"] or 0,
+                "transactionCount": row["transaction_count"],
+            }
+            for row in currency_rows
+        ],
+        "tierBreakdown": [
+            {
+                "tier": row["plan__tier"],
+                "revenueCents": row["revenue_cents"] or 0,
+                "transactionCount": row["transaction_count"],
+            }
+            for row in tier_rows
+        ],
+    }
+
+
 def build_admin_overview(*, period_start: date, period_end: date) -> dict:
     queryset = filter_records_for_period(
         ArtistRevenueRecord.objects.all(),
@@ -264,18 +345,23 @@ def build_admin_overview(*, period_start: date, period_end: date) -> dict:
         period_end=period_end,
     )
     totals = queryset.aggregate(
-        unique_listeners=Sum("unique_listener_count"),
         streams=Sum("stream_count"),
         pending_payments=Count("id", filter=models_q(payment_status=PaymentStatus.PENDING)),
         settled_payments=Count("id", filter=models_q(payment_status=PaymentStatus.SETTLED)),
     )
+    from music.models import StreamEvent
+
+    unique_listeners = StreamEvent.objects.filter(
+        counted=True,
+        streamed_on__range=(period_start, period_end),
+    ).values("listener_id").distinct().count()
     return {
         "periodStart": period_start,
         "periodEnd": period_end,
         "accounting": {
             "recordCount": queryset.count(),
             "artistCount": queryset.values("artist_id").distinct().count(),
-            "uniqueListeners": totals["unique_listeners"] or 0,
+            "uniqueListeners": unique_listeners,
             "streams": totals["streams"] or 0,
             "pendingPayments": totals["pending_payments"] or 0,
             "settledPayments": totals["settled_payments"] or 0,
@@ -286,6 +372,13 @@ def build_admin_overview(*, period_start: date, period_end: date) -> dict:
             "pendingApplications": ArtistApplication.objects.filter(
                 status=ArtistApplicationStatus.PENDING
             ).count(),
+        },
+        "subscriptions": {
+            "distribution": build_subscription_distribution(),
+            "sales": build_subscription_sales(
+                period_start=period_start,
+                period_end=period_end,
+            ),
         },
         "support": build_support_overview(),
         "generatedAt": timezone.now(),

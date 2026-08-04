@@ -8,7 +8,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from artists.models import ArtistProfile
-from music.models import Album, StreamEvent, Track
+from music.models import Album, ListeningHistory, StreamEvent, Track
 from operations.models import SubscriptionPlan
 from subscriptions.models import UserSubscription
 
@@ -52,7 +52,6 @@ class MusicApiTests(APITestCase):
             "explicit": False,
             "isEarlyAccess": False,
         }, format="multipart")
-        print(response.data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertTrue(Track.objects.filter(title="New Track", artist=self.artist).exists())
 
@@ -105,7 +104,18 @@ class MusicApiTests(APITestCase):
     def test_stream_counts_after_thirty_seconds(self):
         track = self.create_track()
         self.client.force_authenticate(user=self.listener)
-        response = self.client.post(reverse("music:track-stream", args=[track.pk]), {
+        stream_url = reverse("music:track-stream", args=[track.pk])
+        self.client.post(
+            stream_url,
+            {"sessionId": "session-1", "listenedSeconds": 0},
+            format="json",
+        )
+        StreamEvent.objects.filter(
+            track=track,
+            listener=self.listener,
+            session_id="session-1",
+        ).update(created_at=timezone.now() - timedelta(seconds=31))
+        response = self.client.post(stream_url, {
             "sessionId": "session-1", "listenedSeconds": 31
         }, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -174,6 +184,16 @@ class MusicApiTests(APITestCase):
         url = reverse("music:track-stream", args=[track.pk])
         self.client.post(
             url,
+            {"sessionId": "stable-count", "listenedSeconds": 0},
+            format="json",
+        )
+        StreamEvent.objects.filter(
+            track=track,
+            listener=self.listener,
+            session_id="stable-count",
+        ).update(created_at=timezone.now() - timedelta(seconds=31))
+        self.client.post(
+            url,
             {"sessionId": "stable-count", "listenedSeconds": 31},
             format="json",
         )
@@ -187,6 +207,18 @@ class MusicApiTests(APITestCase):
             track=track, listener=self.listener, session_id="stable-count"
         )
         self.assertEqual(event.listened_seconds, 31)
+
+    def test_client_cannot_instantly_forge_thirty_second_stream(self):
+        track = self.create_track()
+        self.client.force_authenticate(user=self.listener)
+        response = self.client.post(
+            reverse("music:track-stream", args=[track.pk]),
+            {"sessionId": "forged", "listenedSeconds": 300},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertFalse(response.data["counted"])
+        self.assertEqual(response.data["listenedSeconds"], 0)
 
     def test_artist_can_stream_own_early_access_track(self):
         track = self.create_track(
@@ -278,3 +310,32 @@ class MusicApiTests(APITestCase):
         response = self.client.get(reverse("music:album-detail", args=[album.pk]))
         titles = [item["title"] for item in response.data["tracks"]]
         self.assertEqual(titles, ["Public"])
+
+    def test_basic_user_can_access_early_release_after_release_date(self):
+        track = self.create_track(
+            title="Early Access Graduated",
+            is_early_access=True,
+            release_date=timezone.localdate() - timedelta(days=1),
+        )
+        self.client.force_authenticate(user=self.listener)
+        response = self.client.get(reverse("music:track-detail", args=[track.pk]))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_home_recommendations_are_deterministic_and_history_based(self):
+        listened = self.create_track(title="Known Favorite")
+        recommended = self.create_track(title="Same Artist Discovery")
+        unrelated = self.create_track(artist=self.other_artist, title="Unrelated Track")
+        ListeningHistory.objects.create(
+            listener=self.listener,
+            track=listened,
+            last_played_at=timezone.now(),
+            play_count=4,
+        )
+        self.client.force_authenticate(user=self.listener)
+        response = self.client.get(reverse("music:home-list"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        recommendation_ids = [item["track"]["id"] for item in response.data["recommendedTracks"]]
+        self.assertNotIn(str(listened.pk), recommendation_ids)
+        self.assertEqual(recommendation_ids[0], str(recommended.pk))
+        self.assertIn(str(unrelated.pk), recommendation_ids)
+        self.assertIn("Because you listen to", response.data["recommendedTracks"][0]["reason"])

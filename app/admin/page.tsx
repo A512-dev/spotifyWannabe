@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { PageHeader, StatCard } from "@/components/shared";
-import { Badge, Button, Card, Input, Modal, Table, Tabs, type TableColumn } from "@/components/ui";
+import { PageHeader, StatCard, SubscriptionDistributionChart } from "@/components/shared";
+import { Badge, Button, Card, Input, Modal, Select, Table, Tabs, type TableColumn } from "@/components/ui";
 import {
   operationsApi,
   type AdminOverviewApi,
+  type ApprovedArtistApi,
+  type RevenueGenerationInput,
   type RevenueRecordApi,
   type SubscriptionPlanApi
 } from "@/features/operations/api";
@@ -18,9 +20,25 @@ function errorMessage(error: unknown) {
   return error instanceof ApiError ? error.message : "The request could not be completed.";
 }
 
+function localDateInput(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function defaultRevenuePeriod() {
+  const today = new Date();
+  return {
+    periodStart: localDateInput(new Date(today.getFullYear(), today.getMonth(), 1)),
+    periodEnd: localDateInput(today)
+  };
+}
+
 export default function AdminPage() {
   const { currentUser } = useAuth();
   const [plans, setPlans] = useState<SubscriptionPlanApi[]>([]);
+  const [artists, setArtists] = useState<ApprovedArtistApi[]>([]);
   const [records, setRecords] = useState<RevenueRecordApi[]>([]);
   const [overview, setOverview] = useState<AdminOverviewApi | null>(null);
   const [silverPrice, setSilverPrice] = useState("");
@@ -29,20 +47,34 @@ export default function AdminPage() {
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [generation, setGeneration] = useState<RevenueGenerationInput>(() => ({
+    artistId: "",
+    ...defaultRevenuePeriod(),
+    currency: "USD",
+    perStreamCents: 2,
+    perUniqueListenerCents: 5,
+    platformFeePercent: 20
+  }));
 
   const loadData = useCallback(async () => {
     if (currentUser?.role !== "admin") return;
     setLoading(true);
     setNotice("");
     try {
-      const [planData, revenueData, overviewData] = await Promise.all([
+      const [planData, revenueData, overviewData, artistData] = await Promise.all([
         operationsApi.listSubscriptionPlans(),
         operationsApi.listRevenue(),
-        operationsApi.adminOverview()
+        operationsApi.adminOverview(),
+        operationsApi.listApprovedArtists()
       ]);
       setPlans(planData);
       setRecords(revenueData.results);
       setOverview(overviewData);
+      setArtists(artistData.results);
+      setGeneration((current) => ({
+        ...current,
+        artistId: current.artistId || artistData.results[0]?.id || ""
+      }));
       setSilverPrice(String(planData.find((plan) => plan.tier === "silver")?.monthlyPriceCents ?? ""));
       setGoldPrice(String(planData.find((plan) => plan.tier === "gold")?.monthlyPriceCents ?? ""));
     } catch (error) {
@@ -85,6 +117,32 @@ export default function AdminPage() {
       await operationsApi.settleRevenue(selectedRecord.id);
       setNotice("Artist payout marked as settled.");
       setSelectedRecord(null);
+      await loadData();
+    } catch (error) {
+      setNotice(errorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const generateRevenue = async () => {
+    if (!generation.artistId || generation.periodEnd < generation.periodStart) {
+      setNotice("Choose an artist and a valid accounting period.");
+      return;
+    }
+    if (
+      generation.perStreamCents < 0 ||
+      generation.perUniqueListenerCents < 0 ||
+      generation.platformFeePercent < 0 ||
+      generation.platformFeePercent > 100
+    ) {
+      setNotice("Revenue rates must be non-negative and the platform fee must be between 0 and 100.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await operationsApi.generateRevenue(generation);
+      setNotice("The monthly accounting record was generated from verified stream events.");
       await loadData();
     } catch (error) {
       setNotice(errorMessage(error));
@@ -136,7 +194,33 @@ export default function AdminPage() {
   );
 
   const accountingPanel = (
-    <Table columns={revenueColumns} emptyMessage={loading ? "Loading accounting records..." : "No accounting records found."} getRowKey={(row) => row.id} rows={records} />
+    <div className="space-y-5">
+      <Card>
+        <h2 className="text-lg font-semibold text-slate-50">Generate monthly artist accounting</h2>
+        <p className="mt-2 text-sm text-slate-400">Counts and unique listeners are aggregated from server-verified StreamEvent records.</p>
+        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <Select
+            label="Artist"
+            onChange={(event) => setGeneration((value) => ({ ...value, artistId: event.target.value }))}
+            options={artists.length ? artists.map((artist) => ({ value: artist.id, label: artist.stageName })) : [{ value: "", label: "No approved artists" }]}
+            value={generation.artistId}
+          />
+          <Input label="Period start" onChange={(event) => setGeneration((value) => ({ ...value, periodStart: event.target.value }))} type="date" value={generation.periodStart} />
+          <Input label="Period end" onChange={(event) => setGeneration((value) => ({ ...value, periodEnd: event.target.value }))} type="date" value={generation.periodEnd} />
+          <Select
+            label="Currency"
+            onChange={(event) => setGeneration((value) => ({ ...value, currency: event.target.value as RevenueGenerationInput["currency"] }))}
+            options={[{ value: "USD", label: "USD" }, { value: "EUR", label: "EUR" }, { value: "IRR", label: "IRR" }]}
+            value={generation.currency}
+          />
+          <Input label="Cents per stream" min={0} onChange={(event) => setGeneration((value) => ({ ...value, perStreamCents: Number(event.target.value) }))} type="number" value={generation.perStreamCents} />
+          <Input label="Cents per unique listener" min={0} onChange={(event) => setGeneration((value) => ({ ...value, perUniqueListenerCents: Number(event.target.value) }))} type="number" value={generation.perUniqueListenerCents} />
+          <Input label="Platform fee (%)" max={100} min={0} onChange={(event) => setGeneration((value) => ({ ...value, platformFeePercent: Number(event.target.value) }))} type="number" value={generation.platformFeePercent} />
+        </div>
+        <Button className="mt-4" disabled={busy || !generation.artistId} onClick={() => void generateRevenue()}>Generate record</Button>
+      </Card>
+      <Table columns={revenueColumns} emptyMessage={loading ? "Loading accounting records..." : "No accounting records found."} getRowKey={(row) => row.id} rows={records} />
+    </div>
   );
 
   const reportsPanel = (
@@ -148,7 +232,28 @@ export default function AdminPage() {
         <StatCard label="Unique listeners" value={formatNumber(overview?.accounting.uniqueListeners ?? 0)} />
       </div>
       <Card>
-        <h2 className="text-lg font-semibold text-slate-50">Revenue by currency</h2>
+        <h2 className="text-lg font-semibold text-slate-50">Subscription distribution</h2>
+        <p className="mt-2 text-sm text-slate-400">Current active user accounts grouped by their effective subscription tier.</p>
+        <div className="mt-5">
+          <SubscriptionDistributionChart distribution={overview?.subscriptions.distribution ?? { basic: 0, silver: 0, gold: 0, total: 0 }} />
+        </div>
+      </Card>
+      <Card>
+        <h2 className="text-lg font-semibold text-slate-50">Subscription sales in period</h2>
+        <p className="mt-2 text-sm text-slate-400">Only successfully verified payment transactions are included.</p>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          {(overview?.subscriptions.sales.currencyBreakdown ?? []).map((row) => (
+            <div className="rounded-md border border-surface-600 p-4" key={row.currency}>
+              <p className="text-sm font-medium text-slate-100">{row.currency}</p>
+              <p className="mt-2 text-xl font-semibold text-slate-50">{formatCurrencyFromCents(row.revenueCents, row.currency)}</p>
+              <p className="text-sm text-slate-400">{formatNumber(row.transactionCount)} successful sale(s)</p>
+            </div>
+          ))}
+          {overview && overview.subscriptions.sales.currencyBreakdown.length === 0 ? <p className="text-sm text-slate-400">No successful subscription sales in this period.</p> : null}
+        </div>
+      </Card>
+      <Card>
+        <h2 className="text-lg font-semibold text-slate-50">Artist accounting by currency</h2>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           {(overview?.accounting.currencyBreakdown ?? []).map((row) => (
             <div className="rounded-md border border-surface-600 p-4" key={row.currency}>

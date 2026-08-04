@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from calendar import monthrange
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.db import transaction
 from django.utils import timezone
@@ -23,11 +23,60 @@ def add_calendar_months(value: datetime, months: int) -> datetime:
     return value.replace(year=year, month=month, day=day)
 
 
+def process_subscription_lifecycle(*, user=None, now=None) -> tuple[int, int]:
+    """Expire subscriptions and create one seven-day warning per end date.
+
+    This service is safe to call from requests and from the management command. That
+    keeps subscription state current even when no external task scheduler is running.
+    """
+    from notifications.models import Notification, NotificationType
+    from notifications.services import create_notification
+
+    now = now or timezone.now()
+    subscriptions = UserSubscription.objects.all()
+    if user is not None:
+        subscriptions = subscriptions.filter(user=user)
+
+    expired = subscriptions.filter(
+        status=SubscriptionStatus.ACTIVE,
+        ends_at__lte=now,
+    ).update(status=SubscriptionStatus.EXPIRED)
+
+    warning_end = now + timedelta(days=7)
+    expiring = subscriptions.select_related("user", "plan").filter(
+        status=SubscriptionStatus.ACTIVE,
+        ends_at__gt=now,
+        ends_at__lte=warning_end,
+    )
+    notified = 0
+    for subscription in expiring:
+        end_date = subscription.ends_at.date().isoformat()
+        message = (
+            f"Your {subscription.plan.get_tier_display()} subscription ends on {end_date}."
+        )
+        already_sent = Notification.objects.filter(
+            recipient=subscription.user,
+            type=NotificationType.BILLING,
+            title="Subscription expiring soon",
+            message=message,
+        ).exists()
+        if already_sent:
+            continue
+        notification = create_notification(
+            recipient_id=subscription.user_id,
+            type=NotificationType.BILLING,
+            title="Subscription expiring soon",
+            message=message,
+            action_href="/settings",
+        )
+        if notification:
+            notified += 1
+    return expired, notified
+
+
 def active_subscription_for(user):
     now = timezone.now()
-    UserSubscription.objects.filter(user=user, status=SubscriptionStatus.ACTIVE, ends_at__lte=now).update(
-        status=SubscriptionStatus.EXPIRED
-    )
+    process_subscription_lifecycle(user=user, now=now)
     return (
         UserSubscription.objects.select_related("plan")
         .filter(user=user, status=SubscriptionStatus.ACTIVE, ends_at__gt=now)

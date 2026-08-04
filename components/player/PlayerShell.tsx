@@ -15,7 +15,9 @@ export function PlayerShell() {
   const currentTrack = tracks.find((track) => track.id === playerState.currentTrackId);
   const currentArtist = currentTrack?.artistName ? { stageName: currentTrack.artistName } : null;
   const streamSessionRef = useRef<string>("");
-  const streamReportedRef = useRef(false);
+  const streamStartedRef = useRef(false);
+  const streamRequestPendingRef = useRef(false);
+  const lastStreamReportRef = useRef(0);
 
   const [activeQueue, setActiveQueue] = useState<Track[]>(tracks);
   const [isMobileExpanded, setIsMobileExpanded] = useState(false);
@@ -95,7 +97,9 @@ export function PlayerShell() {
     audio.load();
     setProgress(0);
     streamSessionRef.current = `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    streamReportedRef.current = false;
+    streamStartedRef.current = false;
+    streamRequestPendingRef.current = false;
+    lastStreamReportRef.current = 0;
   }, [currentTrack]);
 
   useEffect(() => {
@@ -138,16 +142,38 @@ export function PlayerShell() {
     setProgress(time);
   };
 
-  const reportStream = (seconds: number) => {
-    if (!currentTrack || streamReportedRef.current || seconds < 30) return;
-    streamReportedRef.current = true;
-    void musicApi.registerStream(currentTrack.id, streamSessionRef.current, Math.floor(seconds)).catch(() => {
-      streamReportedRef.current = false;
-    });
+  const reportStream = (seconds: number, force = false) => {
+    if (!currentTrack || streamRequestPendingRef.current) return;
+    const reportedSeconds = Math.max(0, Math.floor(seconds));
+    const sessionId = streamSessionRef.current;
+
+    if (!streamStartedRef.current) {
+      streamStartedRef.current = true;
+      streamRequestPendingRef.current = true;
+      void musicApi.registerStream(currentTrack.id, sessionId, 0)
+        .catch(() => {
+          if (streamSessionRef.current === sessionId) streamStartedRef.current = false;
+        })
+        .finally(() => {
+          if (streamSessionRef.current === sessionId) streamRequestPendingRef.current = false;
+        });
+      return;
+    }
+
+    if (!force && reportedSeconds - lastStreamReportRef.current < 10) return;
+    streamRequestPendingRef.current = true;
+    void musicApi.registerStream(currentTrack.id, sessionId, reportedSeconds)
+      .then(() => {
+        if (streamSessionRef.current === sessionId) lastStreamReportRef.current = reportedSeconds;
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (streamSessionRef.current === sessionId) streamRequestPendingRef.current = false;
+      });
   };
 
   const handleAudioEnded = () => {
-    reportStream(audioRef.current?.currentTime ?? currentTrack.durationSeconds);
+    reportStream(audioRef.current?.currentTime ?? currentTrack.durationSeconds, true);
     if (repeat === "one" && audioRef.current) {
       audioRef.current.currentTime = 0;
       void audioRef.current.play();
@@ -169,6 +195,8 @@ export function PlayerShell() {
     <>
       <audio
         onEnded={handleAudioEnded}
+        onPause={(event) => reportStream(event.currentTarget.currentTime, true)}
+        onPlay={() => reportStream(0, true)}
         onTimeUpdate={(event) => {
           const seconds = Math.floor(event.currentTarget.currentTime);
           setProgress(seconds);
