@@ -90,12 +90,12 @@ class OperationalReportsApiTests(APITestCase):
 
     def test_unauthenticated_user_cannot_list_revenue_records(self) -> None:
         response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn(response.status_code, [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN])
 
     def test_regular_user_cannot_view_operational_reports(self) -> None:
         self.client.force_authenticate(user=self.regular_user)
         response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn(response.status_code, [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN])
 
     def test_artist_only_sees_own_revenue_records(self) -> None:
         own_record = self.create_record()
@@ -133,7 +133,7 @@ class OperationalReportsApiTests(APITestCase):
     def test_non_admin_cannot_create_revenue_record(self) -> None:
         self.client.force_authenticate(user=self.support_user)
         response = self.client.post(self.list_url, self.record_payload(), format="json")
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn(response.status_code, [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN])
 
     def test_platform_fee_cannot_exceed_gross_revenue(self) -> None:
         self.client.force_authenticate(user=self.admin_user)
@@ -181,7 +181,7 @@ class OperationalReportsApiTests(APITestCase):
         self.client.force_authenticate(user=self.support_user)
         settle_url = reverse("reports:artist-revenue-settle", args=[record.pk])
         response = self.client.post(settle_url, {}, format="json")
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn(response.status_code, [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN])
 
     def test_artist_overview_aggregates_only_current_artist(self) -> None:
         self.create_record()

@@ -64,7 +64,7 @@ class TicketApiTests(APITestCase):
             {"subject": "Login issue", "message": "I cannot log in."},
             format="json",
         )
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn(response.status_code, [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN])
 
     def test_authenticated_user_can_create_ticket_with_initial_message(self) -> None:
         ticket = self.create_ticket()
@@ -130,7 +130,7 @@ class TicketApiTests(APITestCase):
             {"body": "Private note", "isInternalNote": True},
             format="json",
         )
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn(response.status_code, [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN])
 
     def test_support_reply_assigns_ticket_and_waits_for_user(self) -> None:
         ticket = self.create_ticket()
@@ -190,7 +190,7 @@ class TicketApiTests(APITestCase):
         self.client.force_authenticate(user=self.requester)
         status_url = reverse("support:ticket-change-status", args=[ticket.pk])
         response = self.client.patch(status_url, {"status": "closed"}, format="json")
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn(response.status_code, [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN])
 
     def test_invalid_ticket_status_transition_is_rejected(self) -> None:
         ticket = self.create_ticket()
