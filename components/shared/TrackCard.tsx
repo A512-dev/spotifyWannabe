@@ -91,7 +91,7 @@ export function TrackCard({ artistName, contextQueue, onSelect, track }: TrackCa
           <div className="flex items-center gap-3 shrink-0 text-xs text-white/40 font-medium sm:text-right">
             <span>{formatDuration(track.durationSeconds)}</span>
             <span className="text-[10px] opacity-40">•</span>
-            <span>{formatNumber(track.playCount)} plays</span>
+            <span>{formatNumber(track.playCount ?? 0)} plays</span>
           </div>
         </div>
 

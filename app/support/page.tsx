@@ -89,7 +89,7 @@ function normalizeSeedApprovalItems(): ApprovalQueueItem[] {
 }
 
 export default function SupportPage() {
-  const { artistApplications, currentUser } = useAuth();
+  const { currentUser } = useAuth();
   const [tickets, setTickets] = useState<Ticket[]>(initialTickets);
   const [ticketMessages, setTicketMessages] = useState<TicketMessage[]>(initialTicketMessages);
   const [selectedTicketId, setSelectedTicketId] = useState<string>(initialTickets[0]?.id ?? "");
@@ -101,17 +101,7 @@ export default function SupportPage() {
   const [reviewNote, setReviewNote] = useState("");
 
   const approvalItems = useMemo<ApprovalQueueItem[]>(() => {
-    const signupApplications: ApprovalQueueItem[] = artistApplications.map((application) => ({
-      id: application.id,
-      source: "signup",
-      stageName: application.stageName,
-      email: application.email,
-      portfolioSamples: application.portfolioSamples,
-      status: application.status,
-      submittedAt: application.submittedAt
-    }));
-
-    return [...normalizeSeedApprovalItems(), ...signupApplications].map((item) => {
+    return normalizeSeedApprovalItems().map((item) => {
       const override = reviewOverrides[item.id];
 
       if (!override) {
@@ -126,7 +116,7 @@ export default function SupportPage() {
         reviewNote: override.reviewNote
       };
     });
-  }, [artistApplications, reviewOverrides]);
+  }, [reviewOverrides]);
 
   const selectedTicket = useMemo(
     () => tickets.find((ticket) => ticket.id === selectedTicketId) ?? tickets[0],

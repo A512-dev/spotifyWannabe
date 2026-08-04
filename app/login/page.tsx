@@ -11,10 +11,7 @@ import { getPostLoginPath } from "@/lib/auth";
 import { useAuth } from "@/providers";
 
 function getSafeNextPath(nextPath: string | null) {
-  if (!nextPath || !nextPath.startsWith("/") || nextPath.startsWith("//")) {
-    return null;
-  }
-
+  if (!nextPath || !nextPath.startsWith("/") || nextPath.startsWith("//")) return null;
   return nextPath;
 }
 
@@ -27,60 +24,34 @@ function LoginForm() {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
     setIsSubmitting(true);
-
-    const user = login(email, password);
-
-    if (!user) {
-      setError("Email or password is incorrect.");
+    const result = await login(email, password);
+    if (!result.ok || !result.data) {
+      setError(result.error ?? "Email or password is incorrect.");
       setIsSubmitting(false);
       return;
     }
-
     const nextPath = getSafeNextPath(searchParams.get("next"));
-    const destination = nextPath && canAccessRoute(user, nextPath) ? nextPath : getPostLoginPath(user);
-
+    const destination = nextPath && canAccessRoute(result.data, nextPath) ? nextPath : getPostLoginPath(result.data);
     router.push(destination);
   };
 
   return (
     <>
       <form className="space-y-4" onSubmit={handleSubmit}>
-        <Input
-          autoComplete="email"
-          label="Email"
-          name="email"
-          onChange={(event) => setEmail(event.target.value)}
-          placeholder="maya.listener@example.com"
-          required
-          type="email"
-          value={email}
-        />
-        <Input
-          autoComplete="current-password"
-          label="Password"
-          name="password"
-          onChange={(event) => setPassword(event.target.value)}
-          placeholder="password123"
-          required
-          type="password"
-          value={password}
-        />
+        <Input autoComplete="email" label="Email" name="email" onChange={(e) => setEmail(e.target.value)} required type="email" value={email} />
+        <Input autoComplete="current-password" label="Password" name="password" onChange={(e) => setPassword(e.target.value)} required type="password" value={password} />
         {error ? <p className="text-sm text-red-300">{error}</p> : null}
         <Button className="w-full" disabled={isSubmitting} type="submit">
           {isSubmitting ? "Logging in..." : "Log in"}
         </Button>
       </form>
       <div className="mt-4 flex justify-between text-sm text-slate-400">
-        <Link className="hover:text-slate-50" href="/forgot-password">
-          Forgot password?
-        </Link>
-        <Link className="hover:text-slate-50" href="/signup">
-          Create account
-        </Link>
+        <Link className="hover:text-slate-50" href="/forgot-password">Forgot password?</Link>
+        <Link className="hover:text-slate-50" href="/signup">Create account</Link>
       </div>
     </>
   );
@@ -88,13 +59,8 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <AuthLayout
-      description="Use one shared login form for listeners, artists, support users, and admins."
-      title="Log in"
-    >
-      <Suspense fallback={<p className="text-sm text-slate-400">Loading login form...</p>}>
-        <LoginForm />
-      </Suspense>
+    <AuthLayout description="Use one shared login form for listeners, artists, support users, and admins." title="Log in">
+      <Suspense fallback={<p className="text-sm text-slate-400">Loading login form...</p>}><LoginForm /></Suspense>
     </AuthLayout>
   );
 }

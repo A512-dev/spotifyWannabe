@@ -79,8 +79,8 @@ class ArtistSampleWork(TimestampedModel):
         ordering = ["created_at"]
         constraints = [
             models.CheckConstraint(
-                condition=(Q(file__isnull=False) & Q(external_url=""))
-                | (Q(file__isnull=True) & ~Q(external_url="")),
+                condition=(Q(file__isnull=False) & ~Q(file="") & Q(external_url=""))
+                | ((Q(file__isnull=True) | Q(file="")) & ~Q(external_url="")),
                 name="artist_sample_exactly_one_source",
             )
         ]
