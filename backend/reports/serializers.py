@@ -101,3 +101,33 @@ class ArtistRevenueRecordCreateSerializer(serializers.Serializer):
 
     def to_representation(self, instance):
         return ArtistRevenueRecordSerializer(instance, context=self.context).data
+
+
+class ArtistRevenueGenerateSerializer(serializers.Serializer):
+    artistId = serializers.PrimaryKeyRelatedField(
+        source="artist", queryset=ArtistProfile.objects.filter(is_approved=True)
+    )
+    periodStart = serializers.DateField(source="period_start")
+    periodEnd = serializers.DateField(source="period_end")
+    currency = serializers.ChoiceField(choices=["USD", "EUR", "IRR"])
+    perStreamCents = serializers.IntegerField(source="per_stream_cents", min_value=0)
+    perUniqueListenerCents = serializers.IntegerField(
+        source="per_unique_listener_cents", min_value=0
+    )
+    platformFeePercent = serializers.IntegerField(
+        source="platform_fee_percent", min_value=0, max_value=100
+    )
+
+    def validate(self, attrs):
+        if attrs["period_end"] < attrs["period_start"]:
+            raise serializers.ValidationError(
+                {"periodEnd": "The reporting period end cannot be before its start."}
+            )
+        return attrs
+
+    def create(self, validated_data):
+        from reports.services import generate_artist_revenue_record_from_streams
+        return generate_artist_revenue_record_from_streams(**validated_data)
+
+    def to_representation(self, instance):
+        return ArtistRevenueRecordSerializer(instance, context=self.context).data

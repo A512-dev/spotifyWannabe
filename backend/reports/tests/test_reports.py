@@ -5,11 +5,14 @@ from unittest.mock import Mock
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from artists.models import ArtistApplication, ArtistProfile
+from music.models import StreamEvent, Track
 from reports.models import ArtistRevenueRecord, PaymentStatus
 from reports.signals import artist_revenue_record_settled
 from support.models import Ticket, TicketMessage, TicketPriority, TicketStatus
@@ -95,7 +98,7 @@ class OperationalReportsApiTests(APITestCase):
     def test_regular_user_cannot_view_operational_reports(self) -> None:
         self.client.force_authenticate(user=self.regular_user)
         response = self.client.get(self.list_url)
-        self.assertIn(response.status_code, [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN])
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_artist_only_sees_own_revenue_records(self) -> None:
         own_record = self.create_record()
@@ -133,7 +136,7 @@ class OperationalReportsApiTests(APITestCase):
     def test_non_admin_cannot_create_revenue_record(self) -> None:
         self.client.force_authenticate(user=self.support_user)
         response = self.client.post(self.list_url, self.record_payload(), format="json")
-        self.assertIn(response.status_code, [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN])
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_platform_fee_cannot_exceed_gross_revenue(self) -> None:
         self.client.force_authenticate(user=self.admin_user)
@@ -181,7 +184,7 @@ class OperationalReportsApiTests(APITestCase):
         self.client.force_authenticate(user=self.support_user)
         settle_url = reverse("reports:artist-revenue-settle", args=[record.pk])
         response = self.client.post(settle_url, {}, format="json")
-        self.assertIn(response.status_code, [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN])
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_artist_overview_aggregates_only_current_artist(self) -> None:
         self.create_record()
@@ -254,3 +257,50 @@ class OperationalReportsApiTests(APITestCase):
             {"periodStart": "2026-06-01", "periodEnd": "2026-05-01"},
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+    def test_admin_can_generate_revenue_from_stream_events(self) -> None:
+        track = Track.objects.create(
+            artist=self.artist_profile,
+            title="Monthly Track",
+            audio_file=SimpleUploadedFile("monthly.mp3", b"audio"),
+            duration_seconds=180,
+            release_date=date(2026, 5, 1),
+            status="published",
+        )
+        second_listener = User.objects.create_user(
+            username="listener-two", email="listener-two@example.com"
+        )
+        for listener, session_id in [
+            (self.regular_user, "one"),
+            (self.regular_user, "two"),
+            (second_listener, "three"),
+        ]:
+            StreamEvent.objects.create(
+                track=track,
+                listener=listener,
+                session_id=session_id,
+                listened_seconds=31,
+                counted=True,
+                streamed_on=date(2026, 5, 15),
+            )
+        self.client.force_authenticate(user=self.admin_user)
+        response = self.client.post(
+            reverse("reports:artist-revenue-generate"),
+            {
+                "artistId": str(self.artist_profile.pk),
+                "periodStart": "2026-05-01",
+                "periodEnd": "2026-05-31",
+                "currency": "USD",
+                "perStreamCents": 2,
+                "perUniqueListenerCents": 5,
+                "platformFeePercent": 20,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["streamCount"], 3)
+        self.assertEqual(response.data["uniqueListeners"], 2)
+        self.assertEqual(response.data["grossRevenueCents"], 16)
+        self.assertEqual(response.data["platformFeeCents"], 3)
+        self.assertEqual(response.data["netRevenueCents"], 13)

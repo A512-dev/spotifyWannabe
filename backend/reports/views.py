@@ -15,6 +15,7 @@ from reports.models import ArtistRevenueRecord, PaymentStatus, RevenueCurrency
 from reports.permissions import CanViewOperationalReports
 from reports.serializers import (
     ArtistRevenueRecordCreateSerializer,
+    ArtistRevenueGenerateSerializer,
     ArtistRevenueRecordSerializer,
 )
 from reports.services import (
@@ -61,13 +62,15 @@ class ArtistRevenueRecordViewSet(
     ordering = ["-period_start", "artist__stage_name"]
 
     def get_permissions(self):
-        if self.action in {"create", "settle"}:
+        if self.action in {"create", "generate", "settle"}:
             return [IsAdministrator()]
         return [CanViewOperationalReports()]
 
     def get_serializer_class(self):
         if self.action == "create":
             return ArtistRevenueRecordCreateSerializer
+        if self.action == "generate":
+            return ArtistRevenueGenerateSerializer
         return ArtistRevenueRecordSerializer
 
     def get_queryset(self):
@@ -109,6 +112,16 @@ class ArtistRevenueRecordViewSet(
             queryset = queryset.filter(period_start__lte=period_end)
 
         return queryset
+
+    @action(detail=False, methods=["post"], url_path="generate")
+    def generate(self, request):
+        serializer = ArtistRevenueGenerateSerializer(data=request.data, context=self.get_serializer_context())
+        serializer.is_valid(raise_exception=True)
+        record = serializer.save()
+        return Response(
+            ArtistRevenueRecordSerializer(record, context=self.get_serializer_context()).data,
+            status=status.HTTP_201_CREATED,
+        )
 
     @action(detail=True, methods=["post"], url_path="settle")
     def settle(self, request, pk=None):

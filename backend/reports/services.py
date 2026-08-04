@@ -173,6 +173,59 @@ def build_artist_overview(
     }
 
 
+
+def generate_artist_revenue_record_from_streams(
+    *,
+    artist: ArtistProfile,
+    period_start: date,
+    period_end: date,
+    currency: str,
+    per_stream_cents: int,
+    per_unique_listener_cents: int,
+    platform_fee_percent: int,
+) -> ArtistRevenueRecord:
+    """Aggregate real StreamEvent rows into one monthly accounting record.
+
+    The project statement does not provide the promised numeric reward formula, so the
+    rates are explicit administrator inputs/configuration rather than hidden frontend math.
+    """
+    from music.models import StreamEvent
+
+    if period_end < period_start:
+        raise ValidationError({"periodEnd": "The reporting period end cannot be before its start."})
+    if min(per_stream_cents, per_unique_listener_cents) < 0:
+        raise ValidationError({"rates": "Revenue rates cannot be negative."})
+    if platform_fee_percent < 0 or platform_fee_percent > 100:
+        raise ValidationError({"platformFeePercent": "Use a percentage between 0 and 100."})
+
+    events = StreamEvent.objects.filter(
+        track__artist=artist,
+        counted=True,
+        streamed_on__range=(period_start, period_end),
+    )
+    stream_count = events.count()
+    unique_listener_count = events.values("listener_id").distinct().count()
+    gross_revenue_cents = (
+        stream_count * per_stream_cents
+        + unique_listener_count * per_unique_listener_cents
+    )
+    platform_fee_cents = gross_revenue_cents * platform_fee_percent // 100
+    return create_artist_revenue_record(
+        artist=artist,
+        period_start=period_start,
+        period_end=period_end,
+        unique_listener_count=unique_listener_count,
+        stream_count=stream_count,
+        gross_revenue_cents=gross_revenue_cents,
+        platform_fee_cents=platform_fee_cents,
+        currency=currency,
+        calculation_note=(
+            f"Backend aggregation: {per_stream_cents} cents/stream, "
+            f"{per_unique_listener_cents} cents/unique listener, "
+            f"{platform_fee_percent}% platform fee."
+        ),
+    )
+
 def models_q(**kwargs):
     """Local import helper keeps report aggregation declarations compact."""
     from django.db.models import Q
