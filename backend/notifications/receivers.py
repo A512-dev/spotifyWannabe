@@ -92,3 +92,30 @@ def notify_artist_settlement(sender, record_id, artist_user_id, **kwargs):
 def models_q(**kwargs):
     from django.db.models import Q
     return Q(**kwargs)
+
+
+from music.signals import track_published
+
+
+@receiver(track_published)
+def notify_artist_followers_about_release(
+    sender,
+    track_id,
+    artist_user_id,
+    artist_name,
+    track_title,
+    **kwargs,
+):
+    from accounts.models import UserFollow
+
+    follower_ids = UserFollow.objects.filter(following_id=artist_user_id).values_list(
+        "follower_id", flat=True
+    )
+    for follower_id in follower_ids.iterator():
+        create_notification(
+            recipient_id=follower_id,
+            type=NotificationType.ARTIST,
+            title=f"New release from {artist_name}",
+            message=f"{track_title} is now available.",
+            action_href=f"/music?track={track_id}",
+        )

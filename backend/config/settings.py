@@ -42,6 +42,8 @@ INSTALLED_APPS = [
     "operations.apps.OperationsConfig",
     "subscriptions.apps.SubscriptionsConfig",
     "notifications.apps.NotificationsConfig",
+    "music.apps.MusicConfig",
+    "playlists.apps.PlaylistsConfig",
     "reports",
 ]
 
@@ -128,8 +130,8 @@ CORS_URLS_REGEX = r"^/api/.*$"
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.SessionAuthentication",
         "rest_framework.authentication.TokenAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",

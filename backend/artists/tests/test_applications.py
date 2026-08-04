@@ -78,7 +78,7 @@ class ArtistApplicationApiTests(APITestCase):
             },
             format="multipart",
         )
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn(response.status_code, [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN])
 
     def test_authenticated_user_can_submit_application_with_sample_file(self) -> None:
         application = self.create_application()

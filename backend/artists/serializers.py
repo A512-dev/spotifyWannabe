@@ -219,3 +219,98 @@ class ArtistApplicationReviewSerializer(serializers.Serializer):
                 {"reviewNote": "A clear rejection reason is required."}
             )
         return attrs
+
+
+class ArtistProfileSerializer(serializers.ModelSerializer):
+    userId = serializers.SerializerMethodField()
+    stageName = serializers.CharField(source="stage_name", read_only=True)
+    genreTags = serializers.ListField(source="genre_tags", read_only=True)
+    profileImageUrl = serializers.SerializerMethodField()
+    bannerImageUrl = serializers.SerializerMethodField()
+    approvalStatus = serializers.SerializerMethodField()
+    followerCount = serializers.SerializerMethodField()
+    monthlyListeners = serializers.SerializerMethodField()
+    trackCount = serializers.SerializerMethodField()
+    albumCount = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ArtistProfile
+        fields = [
+            "id",
+            "userId",
+            "stageName",
+            "bio",
+            "genreTags",
+            "profileImageUrl",
+            "bannerImageUrl",
+            "approvalStatus",
+            "verifiedAt",
+            "followerCount",
+            "monthlyListeners",
+            "trackCount",
+            "albumCount",
+        ]
+
+    verifiedAt = serializers.DateTimeField(source="verified_at", read_only=True)
+
+    def get_userId(self, obj: ArtistProfile) -> str:
+        return str(obj.user_id)
+
+    def _absolute_url(self, file_field) -> str | None:
+        if not file_field:
+            return None
+        request = self.context.get("request")
+        return request.build_absolute_uri(file_field.url) if request else file_field.url
+
+    def get_profileImageUrl(self, obj: ArtistProfile) -> str | None:
+        return self._absolute_url(obj.profile_image)
+
+    def get_bannerImageUrl(self, obj: ArtistProfile) -> str | None:
+        return self._absolute_url(obj.banner_image)
+
+    def get_approvalStatus(self, obj: ArtistProfile) -> str:
+        return "approved" if obj.is_approved else "pending"
+
+    def get_followerCount(self, obj: ArtistProfile) -> int:
+        from accounts.models import UserFollow
+
+        return UserFollow.objects.filter(following_id=obj.user_id).count()
+
+    def get_monthlyListeners(self, obj: ArtistProfile) -> int | None:
+        request = self.context.get("request")
+        if request is None or not request.user.is_authenticated:
+            return None
+
+        from datetime import timedelta
+
+        from django.utils import timezone
+        from music.models import StreamEvent
+        from operations.models import SubscriptionTier
+        from subscriptions.services import get_current_subscription_tier
+
+        current_profile = getattr(request.user, "artist_profile", None)
+        may_view = (
+            request.user.is_superuser
+            or (current_profile and current_profile.pk == obj.pk)
+            or get_current_subscription_tier(request.user) == SubscriptionTier.GOLD
+        )
+        if not may_view:
+            return None
+
+        period_start = timezone.localdate() - timedelta(days=29)
+        return (
+            StreamEvent.objects.filter(
+                track__artist=obj,
+                counted=True,
+                streamed_on__gte=period_start,
+            )
+            .values("listener_id")
+            .distinct()
+            .count()
+        )
+
+    def get_trackCount(self, obj: ArtistProfile) -> int:
+        return obj.tracks.filter(status="published").count()
+
+    def get_albumCount(self, obj: ArtistProfile) -> int:
+        return obj.albums.filter(status="published").count()
