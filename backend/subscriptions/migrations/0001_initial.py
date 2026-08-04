@@ -1,0 +1,53 @@
+# Generated manually for phase two subscription integration.
+
+import django.db.models.deletion
+import uuid
+from django.conf import settings
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+    initial = True
+    dependencies = [
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
+        ("operations", "0001_initial"),
+    ]
+    operations = [
+        migrations.CreateModel(
+            name="UserSubscription",
+            fields=[
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                ("id", models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
+                ("starts_at", models.DateTimeField()),
+                ("ends_at", models.DateTimeField(db_index=True)),
+                ("status", models.CharField(choices=[("active", "Active"), ("expired", "Expired"), ("canceled", "Canceled")], db_index=True, default="active", max_length=12)),
+                ("plan", models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name="user_subscriptions", to="operations.subscriptionplan")),
+                ("user", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name="subscriptions", to=settings.AUTH_USER_MODEL)),
+            ],
+            options={"ordering": ["-ends_at"]},
+        ),
+        migrations.CreateModel(
+            name="PaymentTransaction",
+            fields=[
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                ("id", models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
+                ("months", models.PositiveSmallIntegerField()),
+                ("amount_cents", models.PositiveBigIntegerField()),
+                ("currency", models.CharField(max_length=3)),
+                ("status", models.CharField(choices=[("pending", "Pending"), ("success", "Success"), ("failed", "Failed"), ("canceled", "Canceled")], db_index=True, default="pending", max_length=12)),
+                ("gateway", models.CharField(default="local-sandbox", max_length=32)),
+                ("authority", models.CharField(blank=True, db_index=True, max_length=128)),
+                ("reference_id", models.CharField(blank=True, max_length=128)),
+                ("gateway_response", models.JSONField(blank=True, default=dict)),
+                ("verified_at", models.DateTimeField(blank=True, null=True)),
+                ("plan", models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name="payment_transactions", to="operations.subscriptionplan")),
+                ("user", models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name="payment_transactions", to=settings.AUTH_USER_MODEL)),
+            ],
+            options={"ordering": ["-created_at"]},
+        ),
+        migrations.AddConstraint(model_name="paymenttransaction", constraint=models.CheckConstraint(condition=models.Q(("months__in", [1, 3, 6, 12])), name="payment_valid_subscription_months")),
+        migrations.AddIndex(model_name="usersubscription", index=models.Index(fields=["user", "status", "-ends_at"], name="subscription_user_status_idx")),
+        migrations.AddIndex(model_name="paymenttransaction", index=models.Index(fields=["user", "status", "-created_at"], name="payment_user_status_idx")),
+    ]
