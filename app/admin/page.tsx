@@ -1,595 +1,193 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader, StatCard } from "@/components/shared";
 import { Badge, Button, Card, Input, Modal, Table, Tabs, type TableColumn } from "@/components/ui";
-import { artistApprovalRequests } from "@/data/artist-approval-requests";
-import { artists } from "@/data/artists";
-import { artistRevenueRecords } from "@/data/financial-records";
-import { subscriptionPrices as initialSubscriptionPrices } from "@/data/subscription-prices";
-import { users } from "@/data/users";
+import {
+  operationsApi,
+  type AdminOverviewApi,
+  type RevenueRecordApi,
+  type SubscriptionPlanApi
+} from "@/features/operations/api";
+import { ApiError } from "@/lib/api";
 import { formatCurrencyFromCents, formatDate, formatNumber } from "@/lib/formatters";
 import { useAuth } from "@/providers";
-import type { ArtistRevenueRecord, SubscriptionPrice, SubscriptionTier } from "@/types/domain";
 
-type PaymentStatus = "pending" | "settled";
-
-interface SettlementState {
-  status: PaymentStatus;
-  settledAt?: string;
-  settledByUserId?: string;
-}
-
-interface SubscriptionDistributionRow {
-  tier: SubscriptionTier;
-  userCount: number;
-  percentage: number;
-}
-
-interface AccountingRow extends ArtistRevenueRecord {
-  artistName: string;
-  uniqueListeners: number;
-  paymentStatus: PaymentStatus;
-  settledAt?: string;
-}
-
-const tierLabels: Record<SubscriptionTier, string> = {
-  basic: "Basic",
-  silver: "Silver",
-  gold: "Gold"
-};
-
-const billingPeriods = [1, 3, 6, 12];
-
-function calculateSubscriptionDistribution(): SubscriptionDistributionRow[] {
-  const totalUsers = users.length || 1;
-
-  return (["basic", "silver", "gold"] as SubscriptionTier[]).map((tier) => {
-    const userCount = users.filter((user) => user.subscriptionTier === tier).length;
-
-    return {
-      tier,
-      userCount,
-      percentage: Math.round((userCount / totalUsers) * 100)
-    };
-  });
-}
-
-function getArtistName(artistId: string) {
-  return artists.find((artist) => artist.id === artistId)?.stageName ?? "Unknown artist";
-}
-
-function getArtistMonthlyListeners(artistId: string) {
-  return artists.find((artist) => artist.id === artistId)?.monthlyListeners ?? 0;
-}
-
-function parseDollarInput(value: string) {
-  const numericValue = Number(value);
-
-  if (Number.isNaN(numericValue) || numericValue < 0) {
-    return null;
-  }
-
-  return Math.round(numericValue * 100);
-}
-
-function formatDollarsFromCents(cents: number) {
-  return (cents / 100).toFixed(2);
+function errorMessage(error: unknown) {
+  return error instanceof ApiError ? error.message : "The request could not be completed.";
 }
 
 export default function AdminPage() {
   const { currentUser } = useAuth();
-  const [subscriptionPrices, setSubscriptionPrices] = useState<SubscriptionPrice[]>(initialSubscriptionPrices);
-  const [silverMonthlyInput, setSilverMonthlyInput] = useState(() =>
-    formatDollarsFromCents(initialSubscriptionPrices.find((price) => price.tier === "silver")?.monthlyPriceCents ?? 0)
-  );
-  const [goldMonthlyInput, setGoldMonthlyInput] = useState(() =>
-    formatDollarsFromCents(initialSubscriptionPrices.find((price) => price.tier === "gold")?.monthlyPriceCents ?? 0)
-  );
-  const [pricingMessage, setPricingMessage] = useState("");
-  const [maintenanceMode, setMaintenanceMode] = useState(false);
-  const [settlements, setSettlements] = useState<Record<string, SettlementState>>({});
-  const [selectedSettlementId, setSelectedSettlementId] = useState<string | null>(null);
+  const [plans, setPlans] = useState<SubscriptionPlanApi[]>([]);
+  const [records, setRecords] = useState<RevenueRecordApi[]>([]);
+  const [overview, setOverview] = useState<AdminOverviewApi | null>(null);
+  const [silverPrice, setSilverPrice] = useState("");
+  const [goldPrice, setGoldPrice] = useState("");
+  const [selectedRecord, setSelectedRecord] = useState<RevenueRecordApi | null>(null);
+  const [notice, setNotice] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
 
-  const subscriptionDistribution = useMemo(() => calculateSubscriptionDistribution(), []);
-  const pendingApprovalsCount = artistApprovalRequests.filter((item) => item.status === "pending").length;
-  const supportUsersCount = users.filter((user) => user.role === "support").length;
-  const artistUsersCount = users.filter((user) => user.role === "artist").length;
-  const listenerUsersCount = users.filter((user) => user.role === "listener").length;
+  const loadData = useCallback(async () => {
+    if (currentUser?.role !== "admin") return;
+    setLoading(true);
+    setNotice("");
+    try {
+      const [planData, revenueData, overviewData] = await Promise.all([
+        operationsApi.listSubscriptionPlans(),
+        operationsApi.listRevenue(),
+        operationsApi.adminOverview()
+      ]);
+      setPlans(planData);
+      setRecords(revenueData.results);
+      setOverview(overviewData);
+      setSilverPrice(String(planData.find((plan) => plan.tier === "silver")?.monthlyPriceCents ?? ""));
+      setGoldPrice(String(planData.find((plan) => plan.tier === "gold")?.monthlyPriceCents ?? ""));
+    } catch (error) {
+      setNotice(errorMessage(error));
+    } finally {
+      setLoading(false);
+    }
+  }, [currentUser?.role]);
 
-  const monthlySubscriptionRevenueCents = users.reduce((sum, user) => {
-    const price = subscriptionPrices.find((item) => item.tier === user.subscriptionTier);
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
 
-    return sum + (price?.monthlyPriceCents ?? 0);
-  }, 0);
-
-  const totalArtistPayoutCents = artistRevenueRecords.reduce((sum, record) => sum + record.netRevenueCents, 0);
-
-  const estimatedPlatformNetCents =
-    artistRevenueRecords.reduce((sum, record) => sum + record.platformFeeCents, 0) + monthlySubscriptionRevenueCents;
-
-  const accountingRows = useMemo<AccountingRow[]>(
-    () =>
-      artistRevenueRecords.map((record) => ({
-        ...record,
-        artistName: getArtistName(record.artistId),
-        uniqueListeners: getArtistMonthlyListeners(record.artistId),
-        paymentStatus: settlements[record.id]?.status ?? "pending",
-        settledAt: settlements[record.id]?.settledAt
-      })),
-    [settlements]
-  );
-
-  const selectedSettlementRow = useMemo(
-    () => accountingRows.find((row) => row.id === selectedSettlementId) ?? null,
-    [accountingRows, selectedSettlementId]
-  );
-
-  const pieGradient = useMemo(() => {
-    const basic = subscriptionDistribution.find((row) => row.tier === "basic")?.percentage ?? 0;
-    const silver = subscriptionDistribution.find((row) => row.tier === "silver")?.percentage ?? 0;
-    const basicEnd = basic;
-    const silverEnd = basic + silver;
-
-    return `conic-gradient(#64748b 0% ${basicEnd}%, #94a3b8 ${basicEnd}% ${silverEnd}%, #22c55e ${silverEnd}% 100%)`;
-  }, [subscriptionDistribution]);
-
-  const updateSubscriptionPrices = () => {
-    const silverMonthlyCents = parseDollarInput(silverMonthlyInput);
-    const goldMonthlyCents = parseDollarInput(goldMonthlyInput);
-
-    if (silverMonthlyCents === null || goldMonthlyCents === null) {
-      setPricingMessage("Please enter valid non-negative prices for Silver and Gold plans.");
+  const updatePrices = async () => {
+    const silver = Number(silverPrice);
+    const gold = Number(goldPrice);
+    if (!Number.isInteger(silver) || !Number.isInteger(gold) || silver <= 0 || gold <= 0 || silver > gold) {
+      setNotice("Enter positive prices in cents and keep Gold at least as expensive as Silver.");
       return;
     }
-
-    if (silverMonthlyCents > goldMonthlyCents) {
-      setPricingMessage("Silver should not be more expensive than Gold.");
-      return;
+    setBusy(true);
+    try {
+      await Promise.all([
+        operationsApi.updateSubscriptionPrice("silver", silver),
+        operationsApi.updateSubscriptionPrice("gold", gold)
+      ]);
+      setNotice("Subscription prices were updated for the whole system.");
+      await loadData();
+    } catch (error) {
+      setNotice(errorMessage(error));
+    } finally {
+      setBusy(false);
     }
+  };
 
-    setSubscriptionPrices((currentPrices) =>
-      currentPrices.map((price) => {
-        if (price.tier === "silver") {
-          return {
-            ...price,
-            monthlyPriceCents: silverMonthlyCents,
-            annualPriceCents: silverMonthlyCents * 10
-          };
-        }
+  const settle = async () => {
+    if (!selectedRecord) return;
+    setBusy(true);
+    try {
+      await operationsApi.settleRevenue(selectedRecord.id);
+      setNotice("Artist payout marked as settled.");
+      setSelectedRecord(null);
+      await loadData();
+    } catch (error) {
+      setNotice(errorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  };
 
-        if (price.tier === "gold") {
-          return {
-            ...price,
-            monthlyPriceCents: goldMonthlyCents,
-            annualPriceCents: goldMonthlyCents * 10
-          };
-        }
+  const planColumns = useMemo<TableColumn<SubscriptionPlanApi>[]>(() => [
+    { key: "tier", header: "Tier", render: (row) => <span className="font-medium capitalize text-slate-50">{row.tier}</span> },
+    { key: "monthly", header: "Monthly", render: (row) => formatCurrencyFromCents(row.monthlyPriceCents, row.currency) },
+    { key: "three", header: "3 months", render: (row) => formatCurrencyFromCents(row.periodPrices["3"] ?? row.monthlyPriceCents * 3, row.currency) },
+    { key: "six", header: "6 months", render: (row) => formatCurrencyFromCents(row.periodPrices["6"] ?? row.monthlyPriceCents * 6, row.currency) },
+    { key: "twelve", header: "12 months", render: (row) => formatCurrencyFromCents(row.periodPrices["12"] ?? row.monthlyPriceCents * 12, row.currency) },
+    { key: "playlists", header: "Playlist limit", render: (row) => row.playlistLimit === null ? "Unlimited" : formatNumber(row.playlistLimit) }
+  ], []);
 
-        return price;
-      })
+  const revenueColumns = useMemo<TableColumn<RevenueRecordApi>[]>(() => [
+    { key: "artist", header: "Artist", render: (row) => <div><p className="font-medium text-slate-50">{row.artistName}</p><p className="text-xs text-slate-400">{row.artistId}</p></div> },
+    { key: "period", header: "Period", render: (row) => `${formatDate(row.periodStart)} - ${formatDate(row.periodEnd)}` },
+    { key: "listeners", header: "Listeners", render: (row) => formatNumber(row.uniqueListeners) },
+    { key: "streams", header: "Streams", render: (row) => formatNumber(row.streamCount) },
+    { key: "payout", header: "Payout", render: (row) => formatCurrencyFromCents(row.netRevenueCents, row.currency) },
+    { key: "status", header: "Status", render: (row) => <Badge tone={row.paymentStatus === "settled" ? "success" : "warning"}>{row.paymentStatus}</Badge> },
+    { key: "action", header: "Action", render: (row) => <Button disabled={row.paymentStatus === "settled"} onClick={() => setSelectedRecord(row)} size="sm" variant="secondary">Mark settled</Button> }
+  ], []);
+
+  if (currentUser && currentUser.role !== "admin") {
+    return (
+      <DashboardLayout eyebrow="Administration">
+        <PageHeader description="Only the system administrator can access this dashboard." title="Access denied" />
+      </DashboardLayout>
     );
+  }
 
-    setPricingMessage("Subscription prices were updated locally for Phase 1.");
-  };
-
-  const confirmSettlement = () => {
-    if (!selectedSettlementRow) {
-      return;
-    }
-
-    setSettlements((currentSettlements) => ({
-      ...currentSettlements,
-      [selectedSettlementRow.id]: {
-        status: "settled",
-        settledAt: new Date().toISOString(),
-        settledByUserId: currentUser?.id
-      }
-    }));
-
-    setSelectedSettlementId(null);
-  };
-
-  const priceColumns: TableColumn<SubscriptionPrice>[] = [
-    {
-      key: "tier",
-      header: "Tier",
-      render: (row) => <span className="font-medium text-slate-50">{tierLabels[row.tier]}</span>
-    },
-    {
-      key: "monthly",
-      header: "Monthly price",
-      render: (row) => formatCurrencyFromCents(row.monthlyPriceCents, row.currency)
-    },
-    {
-      key: "annual",
-      header: "Annual price",
-      render: (row) => formatCurrencyFromCents(row.annualPriceCents, row.currency)
-    },
-    {
-      key: "playlistLimit",
-      header: "Playlist limit",
-      render: (row) => (Number.isFinite(row.playlistLimit) ? formatNumber(row.playlistLimit) : "Unlimited")
-    },
-    {
-      key: "features",
-      header: "Features",
-      render: (row) => (
-        <div className="flex flex-wrap gap-2">
-          {row.supportsOfflineMode ? <Badge tone="success">Download</Badge> : <Badge>Streaming only</Badge>}
-          {row.supportsAdvancedStats ? <Badge tone="info">Advanced stats</Badge> : null}
-        </div>
-      )
-    }
-  ];
-
-  const billingColumns: TableColumn<SubscriptionPrice>[] = [
-    {
-      key: "tier",
-      header: "Tier",
-      render: (row) => <span className="font-medium text-slate-50">{tierLabels[row.tier]}</span>
-    },
-    ...billingPeriods.map<TableColumn<SubscriptionPrice>>((period) => ({
-      key: `${period}-months`,
-      header: `${period} month${period > 1 ? "s" : ""}`,
-      render: (row) => formatCurrencyFromCents(row.monthlyPriceCents * period, row.currency)
-    }))
-  ];
-
-  const accountingColumns: TableColumn<AccountingRow>[] = [
-    {
-      key: "artist",
-      header: "Artist",
-      render: (row) => (
-        <div>
-          <p className="font-medium text-slate-50">{row.artistName}</p>
-          <p className="text-xs text-slate-400">{row.artistId}</p>
-        </div>
-      )
-    },
-    {
-      key: "period",
-      header: "Period",
-      render: (row) => `${formatDate(row.periodStart)} - ${formatDate(row.periodEnd)}`
-    },
-    {
-      key: "listeners",
-      header: "Unique listeners",
-      render: (row) => formatNumber(row.uniqueListeners)
-    },
-    {
-      key: "streams",
-      header: "Streams",
-      render: (row) => formatNumber(row.streamCount)
-    },
-    {
-      key: "payout",
-      header: "Artist payout",
-      render: (row) => formatCurrencyFromCents(row.netRevenueCents, row.currency)
-    },
-    {
-      key: "status",
-      header: "Payment status",
-      render: (row) => (
-        <div className="space-y-1">
-          <Badge tone={row.paymentStatus === "settled" ? "success" : "warning"}>{row.paymentStatus}</Badge>
-          {row.settledAt ? <p className="text-xs text-slate-500">{formatDate(row.settledAt)}</p> : null}
-        </div>
-      )
-    },
-    {
-      key: "actions",
-      header: "Actions",
-      render: (row) => (
-        <Button
-          disabled={row.paymentStatus === "settled"}
-          onClick={() => setSelectedSettlementId(row.id)}
-          size="sm"
-          variant="secondary"
-        >
-          Mark settled
-        </Button>
-      )
-    }
-  ];
-
-  const userColumns: TableColumn<(typeof users)[number]>[] = [
-    {
-      key: "user",
-      header: "User",
-      render: (row) => (
-        <div>
-          <p className="font-medium text-slate-50">{row.displayName}</p>
-          <p className="text-xs text-slate-400">{row.email}</p>
-        </div>
-      )
-    },
-    {
-      key: "role",
-      header: "Role",
-      render: (row) => (
-        <Badge tone={row.role === "admin" ? "danger" : row.role === "support" ? "info" : "neutral"}>{row.role}</Badge>
-      )
-    },
-    {
-      key: "subscription",
-      header: "Subscription",
-      render: (row) => (
-        <Badge tone={row.subscriptionTier === "gold" ? "success" : row.subscriptionTier === "silver" ? "info" : "neutral"}>
-          {row.subscriptionTier}
-        </Badge>
-      )
-    },
-    {
-      key: "verified",
-      header: "Email",
-      render: (row) => <Badge tone={row.isEmailVerified ? "success" : "warning"}>{row.isEmailVerified ? "Verified" : "Unverified"}</Badge>
-    },
-    {
-      key: "lastActive",
-      header: "Last active",
-      render: (row) => formatDate(row.lastActiveAt)
-    }
-  ];
-
-  const pricingTab = (
-    <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
+  const pricingPanel = (
+    <div className="space-y-5">
       <Card>
-        <h2 className="text-lg font-semibold text-slate-50">Subscription price control</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-400">
-          Admins can change Silver and Gold prices without changing code. This Phase 1 version keeps the update in local component state.
-        </p>
-
-        <div className="mt-5 space-y-4">
-          <Input disabled label="Basic monthly price" name="basicPrice" value="0.00" />
-
-          <Input
-            label="Silver monthly price"
-            name="silverPrice"
-            onChange={(event) => setSilverMonthlyInput(event.target.value)}
-            step="0.01"
-            type="number"
-            value={silverMonthlyInput}
-          />
-
-          <Input
-            label="Gold monthly price"
-            name="goldPrice"
-            onChange={(event) => setGoldMonthlyInput(event.target.value)}
-            step="0.01"
-            type="number"
-            value={goldMonthlyInput}
-          />
-
-          {pricingMessage ? <p className="text-sm text-brand-500">{pricingMessage}</p> : null}
-
-          <Button onClick={updateSubscriptionPrices}>Update prices</Button>
+        <h2 className="text-lg font-semibold text-slate-50">Dynamic subscription prices</h2>
+        <p className="mt-2 text-sm text-slate-400">Prices are stored in the backend. Enter integer values in the smallest currency unit.</p>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <Input label="Silver monthly price (cents)" min={1} onChange={(event) => setSilverPrice(event.target.value)} type="number" value={silverPrice} />
+          <Input label="Gold monthly price (cents)" min={1} onChange={(event) => setGoldPrice(event.target.value)} type="number" value={goldPrice} />
         </div>
+        <Button className="mt-4" disabled={busy} onClick={() => void updatePrices()}>Update prices</Button>
       </Card>
-
-      <div className="space-y-4">
-        <Card>
-          <h2 className="mb-4 text-lg font-semibold text-slate-50">Current subscription configuration</h2>
-          <Table columns={priceColumns} getRowKey={(row) => row.tier} rows={subscriptionPrices} />
-        </Card>
-
-        <Card>
-          <h2 className="mb-4 text-lg font-semibold text-slate-50">Billing period preview</h2>
-          <Table columns={billingColumns} getRowKey={(row) => row.tier} rows={subscriptionPrices} />
-        </Card>
-      </div>
+      <Table columns={planColumns} emptyMessage={loading ? "Loading plans..." : "No plans found."} getRowKey={(row) => row.tier} rows={plans} />
     </div>
   );
 
-  const analyticsTab = (
-    <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
-      <Card>
-        <h2 className="text-lg font-semibold text-slate-50">Subscription distribution</h2>
-        <p className="mt-2 text-sm text-slate-400">A simple Phase 1 pie visualization based on mock users.</p>
-
-        <div className="mt-6 flex flex-col items-center gap-5 sm:flex-row">
-          <div
-            aria-label="Subscription distribution chart"
-            className="h-40 w-40 rounded-full border border-surface-600"
-            style={{ background: pieGradient }}
-          />
-
-          <div className="w-full space-y-3">
-            {subscriptionDistribution.map((row) => (
-              <div className="rounded-md border border-surface-600 bg-surface-900 p-3" key={row.tier}>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-medium text-slate-50">{tierLabels[row.tier]}</span>
-                  <span className="text-sm text-slate-400">{row.percentage}%</span>
-                </div>
-                <p className="mt-1 text-xs text-slate-500">{formatNumber(row.userCount)} users</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </Card>
-
-      <Card>
-        <h2 className="text-lg font-semibold text-slate-50">Platform revenue overview</h2>
-        <p className="mt-2 text-sm text-slate-400">Aggregated values are shown as backend-ready mock analytics.</p>
-
-        <div className="mt-5 space-y-4">
-          <div>
-            <div className="mb-2 flex justify-between text-sm">
-              <span className="text-slate-300">Subscription revenue</span>
-              <span className="text-slate-400">{formatCurrencyFromCents(monthlySubscriptionRevenueCents)}</span>
-            </div>
-            <div className="h-3 rounded-full bg-surface-700">
-              <div className="h-3 rounded-full bg-brand-500" style={{ width: "68%" }} />
-            </div>
-          </div>
-
-          <div>
-            <div className="mb-2 flex justify-between text-sm">
-              <span className="text-slate-300">Platform fees</span>
-              <span className="text-slate-400">
-                {formatCurrencyFromCents(artistRevenueRecords.reduce((sum, record) => sum + record.platformFeeCents, 0))}
-              </span>
-            </div>
-            <div className="h-3 rounded-full bg-surface-700">
-              <div className="h-3 rounded-full bg-brand-500" style={{ width: "42%" }} />
-            </div>
-          </div>
-
-          <div>
-            <div className="mb-2 flex justify-between text-sm">
-              <span className="text-slate-300">Artist payouts</span>
-              <span className="text-slate-400">{formatCurrencyFromCents(totalArtistPayoutCents)}</span>
-            </div>
-            <div className="h-3 rounded-full bg-surface-700">
-              <div className="h-3 rounded-full bg-brand-500" style={{ width: "84%" }} />
-            </div>
-          </div>
-        </div>
-      </Card>
-    </div>
+  const accountingPanel = (
+    <Table columns={revenueColumns} emptyMessage={loading ? "Loading accounting records..." : "No accounting records found."} getRowKey={(row) => row.id} rows={records} />
   );
 
-  const accountingTab = (
-    <Card>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-slate-50">Monthly artist accounting</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-400">
-            The admin can review monthly listener counts, streams, calculated payouts, and payment settlement status.
-          </p>
-        </div>
-        <Badge tone="warning">{accountingRows.filter((row) => row.paymentStatus === "pending").length} pending payments</Badge>
+  const reportsPanel = (
+    <div className="space-y-5">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Approved artists" value={formatNumber(overview?.artists.approved ?? 0)} />
+        <StatCard label="Pending artist applications" value={formatNumber(overview?.artists.pendingApplications ?? 0)} />
+        <StatCard label="Streams in period" value={formatNumber(overview?.accounting.streams ?? 0)} />
+        <StatCard label="Unique listeners" value={formatNumber(overview?.accounting.uniqueListeners ?? 0)} />
       </div>
-
-      <div className="mt-5">
-        <Table
-          columns={accountingColumns}
-          emptyMessage="No accounting records are available."
-          getRowKey={(row) => row.id}
-          rows={accountingRows}
-        />
-      </div>
-    </Card>
-  );
-
-  const accessTab = (
-    <div className="grid gap-4 xl:grid-cols-[0.7fr_1.3fr]">
       <Card>
-        <h2 className="text-lg font-semibold text-slate-50">Advanced settings</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-400">
-          These controls represent admin-only operational settings. Phase 2 should persist them in the backend.
-        </p>
-
-        <div className="mt-5 rounded-lg border border-surface-600 bg-surface-900 p-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="font-medium text-slate-50">Maintenance mode</p>
-              <p className="mt-1 text-sm text-slate-400">Show that the platform can be temporarily disabled by admin.</p>
+        <h2 className="text-lg font-semibold text-slate-50">Revenue by currency</h2>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          {(overview?.accounting.currencyBreakdown ?? []).map((row) => (
+            <div className="rounded-md border border-surface-600 p-4" key={row.currency}>
+              <p className="text-sm font-medium text-slate-100">{row.currency}</p>
+              <p className="mt-2 text-sm text-slate-400">Gross: {formatCurrencyFromCents(row.grossRevenueCents, row.currency)}</p>
+              <p className="text-sm text-slate-400">Platform: {formatCurrencyFromCents(row.platformFeeCents, row.currency)}</p>
+              <p className="text-sm text-slate-400">Artist net: {formatCurrencyFromCents(row.artistPayoutCents, row.currency)}</p>
             </div>
-            <Button
-              onClick={() => setMaintenanceMode((currentValue) => !currentValue)}
-              variant={maintenanceMode ? "danger" : "secondary"}
-            >
-              {maintenanceMode ? "Turn off" : "Turn on"}
-            </Button>
-          </div>
-
-          <div className="mt-4">
-            <Badge tone={maintenanceMode ? "danger" : "success"}>{maintenanceMode ? "Maintenance on" : "Maintenance off"}</Badge>
-          </div>
+          ))}
         </div>
       </Card>
-
       <Card>
-        <h2 className="mb-4 text-lg font-semibold text-slate-50">User and access overview</h2>
-        <Table columns={userColumns} getRowKey={(row) => row.id} rows={users} />
+        <h2 className="text-lg font-semibold text-slate-50">Support workload</h2>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard label="Open tickets" value={String(overview?.support.tickets.open ?? 0)} />
+          <StatCard label="Waiting for user" value={String(overview?.support.tickets.waiting_for_user ?? 0)} />
+          <StatCard label="Urgent open" value={String(overview?.support.urgentOpenTickets ?? 0)} />
+          <StatCard label="Unassigned open" value={String(overview?.support.unassignedOpenTickets ?? 0)} />
+        </div>
       </Card>
     </div>
   );
 
   return (
-    <DashboardLayout eyebrow="Admin workspace">
-      <PageHeader
-        description="Manage subscription pricing, platform analytics, artist accounting, and admin-only operational settings."
-        title="Admin"
-      />
-
-      {currentUser && currentUser.role !== "admin" ? (
-        <Card className="mt-6 border-red-500/30 bg-red-500/10">
-          <h2 className="text-lg font-semibold text-red-100">Admin-only workspace</h2>
-          <p className="mt-2 text-sm text-red-100/80">This page is designed for the single system admin role.</p>
-        </Card>
-      ) : null}
-
-      <section className="mt-6 grid gap-4 md:grid-cols-4">
-        <StatCard label="Monthly subscription revenue" value={formatCurrencyFromCents(monthlySubscriptionRevenueCents)} />
-        <StatCard label="Estimated platform net" value={formatCurrencyFromCents(estimatedPlatformNetCents)} />
-        <StatCard label="Pending approvals" value={String(pendingApprovalsCount)} />
-        <StatCard label="Artist payouts" value={formatCurrencyFromCents(totalArtistPayoutCents)} />
-      </section>
-
-      <section className="mt-6 grid gap-4 md:grid-cols-3">
-        <StatCard helperText={`${listenerUsersCount} listeners in mock data`} label="Listener users" value={String(listenerUsersCount)} />
-        <StatCard helperText={`${artistUsersCount} artist accounts in mock data`} label="Artist users" value={String(artistUsersCount)} />
-        <StatCard helperText={`${supportUsersCount} support users in mock data`} label="Support users" value={String(supportUsersCount)} />
-      </section>
-
+    <DashboardLayout eyebrow="Administration">
+      <PageHeader actions={<Button disabled={loading} onClick={() => void loadData()} variant="secondary">Refresh</Button>} description="Manage subscription pricing, artist payouts, and aggregated operational reports." title="Admin dashboard" />
+      {notice ? <p className="mt-4 rounded-md border border-surface-600 bg-surface-800 p-3 text-sm text-slate-200">{notice}</p> : null}
       <section className="mt-6">
-        <Tabs
-          defaultTabId="pricing"
-          tabs={[
-            {
-              id: "pricing",
-              label: "Pricing",
-              content: pricingTab
-            },
-            {
-              id: "analytics",
-              label: "Analytics",
-              content: analyticsTab
-            },
-            {
-              id: "accounting",
-              label: "Accounting",
-              content: accountingTab
-            },
-            {
-              id: "settings",
-              label: "Access and settings",
-              content: accessTab
-            }
-          ]}
-        />
+        <Tabs tabs={[
+          { id: "reports", label: "Overview", content: reportsPanel },
+          { id: "accounting", label: "Artist accounting", content: accountingPanel },
+          { id: "pricing", label: "Subscription pricing", content: pricingPanel }
+        ]} />
       </section>
-
-      <Modal open={Boolean(selectedSettlementRow)} title="Confirm artist settlement" onClose={() => setSelectedSettlementId(null)}>
-        {selectedSettlementRow ? (
+      <Modal onClose={() => setSelectedRecord(null)} open={Boolean(selectedRecord)} title="Confirm settlement">
+        {selectedRecord ? (
           <div className="space-y-4">
-            <p className="text-sm leading-6 text-slate-300">
-              Confirm that the monthly payout for{" "}
-              <span className="font-semibold text-slate-50">{selectedSettlementRow.artistName}</span> has been settled.
-            </p>
-
-            <div className="rounded-md border border-surface-600 bg-surface-900 p-3 text-sm text-slate-300">
-              <div className="flex justify-between gap-4">
-                <span>Period</span>
-                <span>
-                  {formatDate(selectedSettlementRow.periodStart)} - {formatDate(selectedSettlementRow.periodEnd)}
-                </span>
-              </div>
-              <div className="mt-2 flex justify-between gap-4">
-                <span>Artist payout</span>
-                <span>{formatCurrencyFromCents(selectedSettlementRow.netRevenueCents, selectedSettlementRow.currency)}</span>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <Button onClick={() => setSelectedSettlementId(null)} variant="ghost">
-                Cancel
-              </Button>
-              <Button onClick={confirmSettlement}>Confirm settlement</Button>
-            </div>
+            <p className="text-sm text-slate-300">Mark {selectedRecord.artistName}&apos;s payout of {formatCurrencyFromCents(selectedRecord.netRevenueCents, selectedRecord.currency)} as settled?</p>
+            <div className="flex gap-2"><Button disabled={busy} onClick={() => void settle()}>Confirm</Button><Button onClick={() => setSelectedRecord(null)} variant="ghost">Cancel</Button></div>
           </div>
         ) : null}
       </Modal>

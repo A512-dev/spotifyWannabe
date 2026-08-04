@@ -2,7 +2,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const React = require("react");
 const { renderToStaticMarkup } = require("react-dom/server");
-
+const { AuthProvider } = require('../providers/AuthProvider');
 const { PageHeader, TrackCard, AlbumCard, EmptyState } = require("@/components/shared");
 const { Badge, Button, Table } = require("@/components/ui");
 const { albums } = require("@/data/albums");
@@ -89,12 +89,16 @@ test("renders track cards with artist links and play metadata", () => {
   const artist = artists.find((item) => item.id === track.artistId);
   const html = render(
     React.createElement(
-      PlayerProvider,
+      AuthProvider,
       null,
-      React.createElement(TrackCard, {
-        artistName: artist.stageName,
-        track
-      })
+      React.createElement(
+        PlayerProvider,
+        null,
+        React.createElement(TrackCard, {
+          artistName: artist.stageName,
+          track
+        })
+      )
     )
   );
 

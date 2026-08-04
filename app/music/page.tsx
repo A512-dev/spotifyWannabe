@@ -1,194 +1,92 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { MainAppLayout } from "@/components/layout/MainAppLayout";
 import { AlbumCard, PageHeader, TrackCard } from "@/components/shared";
-import { albums } from "@/data/albums";
-import { artists } from "@/data/artists";
-import { playlists as defaultPlaylists } from "@/data/playlists";
-import { tracks } from "@/data/tracks";
-import { readStoredPlaylists, writeStoredPlaylists } from "@/lib/playlist-storage";
-import { useAuth } from "@/providers";
-import type { Track } from "@/types/domain";
+import { musicApi } from "@/features/music/api";
+import type { Album, Track } from "@/types/domain";
 
-function getArtistName(artistId: string) {
-  return artists.find((artist) => artist.id === artistId)?.stageName ?? "Unknown artist";
-}
+type ApiTrack = Track & { artistName?: string };
+type ApiAlbum = Album & { artistName?: string };
 
-function MusicPageContent() {
+function MusicContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { currentUser } = useAuth();
+  const targetPlaylistId = searchParams.get("addToPlaylist");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("newest");
+  const [tracks, setTracks] = useState<ApiTrack[]>([]);
+  const [albums, setAlbums] = useState<ApiAlbum[]>([]);
+  const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
-  const targetPlaylistId = searchParams.get("addToPlaylist");
 
-  const filteredAlbums = useMemo(() => {
-    return albums
-      .filter((album) => {
-        const artistName = getArtistName(album.artistId);
-        const query = searchQuery.toLowerCase();
-        return album.title.toLowerCase().includes(query) || artistName.toLowerCase().includes(query);
-      })
-      .sort((first, second) => {
-        if (sortBy === "newest") {
-          return new Date(second.releaseDate).getTime() - new Date(first.releaseDate).getTime();
-        }
-
-        if (sortBy === "oldest") {
-          return new Date(first.releaseDate).getTime() - new Date(second.releaseDate).getTime();
-        }
-
-        return 0;
-      });
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setLoading(true);
+      const trackOrdering = sortBy === "oldest" ? "release_date" : sortBy === "most_played" ? "-play_count" : "-release_date";
+      const albumOrdering = sortBy === "oldest" ? "release_date" : sortBy === "most_played" ? "-listener_count" : "-release_date";
+      void Promise.all([
+        musicApi.listTracks({ search: searchQuery, ordering: trackOrdering }),
+        musicApi.listAlbums({ search: searchQuery, ordering: albumOrdering })
+      ]).then(([trackResponse, albumResponse]) => {
+        setTracks(trackResponse.results);
+        setAlbums(albumResponse.results);
+        setMessage("");
+      }).catch((error: Error) => setMessage(error.message)).finally(() => setLoading(false));
+    }, 250);
+    return () => window.clearTimeout(timer);
   }, [searchQuery, sortBy]);
 
-  const filteredTracks = useMemo(() => {
-    return tracks
-      .filter((track) => {
-        const artistName = getArtistName(track.artistId);
-        const query = searchQuery.toLowerCase();
-        return track.title.toLowerCase().includes(query) || artistName.toLowerCase().includes(query);
-      })
-      .sort((first, second) => {
-        if (sortBy === "newest") {
-          return new Date(second.releaseDate).getTime() - new Date(first.releaseDate).getTime();
-        }
-
-        if (sortBy === "oldest") {
-          return new Date(first.releaseDate).getTime() - new Date(second.releaseDate).getTime();
-        }
-
-        if (sortBy === "most_played") {
-          return second.playCount - first.playCount;
-        }
-
-        return 0;
-      });
-  }, [searchQuery, sortBy]);
-
-  const handleAddTrackToPlaylist = (track: Track) => {
-    if (!currentUser || !targetPlaylistId) {
-      return;
+  const handleSelect = async (track: Track) => {
+    if (!targetPlaylistId) return;
+    try {
+      await musicApi.addTrackToPlaylist(targetPlaylistId, track.id);
+      router.push("/playlists");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not add this track.");
     }
-
-    const fallbackPlaylists = defaultPlaylists.filter((playlist) => playlist.ownerId === currentUser.id);
-    const storedPlaylists = readStoredPlaylists(currentUser.id, fallbackPlaylists);
-    let playlistFound = false;
-    let trackAlreadyAdded = false;
-    const updatedPlaylists = storedPlaylists.map((playlist) => {
-      if (playlist.id !== targetPlaylistId) {
-        return playlist;
-      }
-
-      playlistFound = true;
-
-      if (playlist.itemIds.includes(track.id)) {
-        trackAlreadyAdded = true;
-        return playlist;
-      }
-
-      return {
-        ...playlist,
-        itemIds: [...playlist.itemIds, track.id],
-        updatedAt: new Date().toISOString()
-      };
-    });
-
-    if (!playlistFound) {
-      setMessage("Playlist was not found.");
-      return;
-    }
-
-    writeStoredPlaylists(currentUser.id, updatedPlaylists);
-
-    if (trackAlreadyAdded) {
-      setMessage(`${track.title} is already in this playlist.`);
-      return;
-    }
-
-    router.push("/playlists");
   };
 
   return (
     <MainAppLayout>
       <PageHeader
-        description={
-          targetPlaylistId
-            ? "Choose a track to add it to the selected playlist."
-            : "Music discovery for browsing albums, tracks, artists, and search results."
-        }
+        description={targetPlaylistId ? "Choose a track for the selected playlist." : "Search albums and tracks by title or artist."}
         title="Music"
       />
-
-      {message ? <p className="mt-4 text-sm text-yellow-200">{message}</p> : null}
-
       <div className="mt-6 flex flex-col gap-4 sm:flex-row">
-        <div className="flex-1">
-          <input
-            className="w-full rounded-md border border-slate-700 bg-slate-800/50 px-4 py-2 text-sm text-slate-50 focus:border-white focus:outline-none"
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Search by title or artist..."
-            type="text"
-            value={searchQuery}
-          />
-        </div>
-        <div className="w-full sm:w-48">
-          <select
-            className="w-full rounded-md border border-slate-700 bg-slate-800/50 px-3 py-2 text-sm text-slate-50 focus:border-white focus:outline-none"
-            onChange={(event) => setSortBy(event.target.value)}
-            value={sortBy}
-          >
-            <option value="newest">Newest releases</option>
-            <option value="oldest">Oldest releases</option>
-            <option value="most_played">Most played tracks</option>
-          </select>
-        </div>
+        <input className="flex-1 rounded-md border border-slate-700 bg-slate-800/50 px-4 py-2 text-sm" onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search by title or artist..." value={searchQuery} />
+        <select className="rounded-md border border-slate-700 bg-slate-800/50 px-3 py-2 text-sm" onChange={(e) => setSortBy(e.target.value)} value={sortBy}>
+          <option value="newest">Newest releases</option>
+          <option value="oldest">Oldest releases</option>
+          <option value="most_played">Most played tracks</option>
+        </select>
       </div>
-
+      {message ? <p className="mt-4 text-sm text-red-300">{message}</p> : null}
+      {loading ? <p className="mt-6 text-sm text-slate-400">Loading catalog...</p> : null}
       <section className="mt-8">
-        <h2 className="mb-4 text-xl font-bold text-slate-50">Albums</h2>
-        {filteredAlbums.length > 0 ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {filteredAlbums.map((album) => (
-              <Link href={`/music/album/${album.id}`} key={album.id}>
-                <AlbumCard album={album} artistName={getArtistName(album.artistId)} />
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-slate-400">No albums found matching your search.</p>
-        )}
+        <h2 className="mb-4 text-xl font-bold">Albums</h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {albums.map((album) => (
+            <Link href={`/music/album/${album.id}`} key={album.id}>
+              <AlbumCard album={album} artistName={album.artistName ?? "Unknown artist"} />
+            </Link>
+          ))}
+        </div>
       </section>
-
       <section className="mt-8">
-        <h2 className="mb-4 text-xl font-bold text-slate-50">Tracks</h2>
-        {filteredTracks.length > 0 ? (
-          <div className="grid gap-3 lg:grid-cols-2">
-            {filteredTracks.map((track) => (
-              <TrackCard
-                artistName={getArtistName(track.artistId)}
-                key={track.id}
-                onSelect={targetPlaylistId ? handleAddTrackToPlaylist : undefined}
-                track={track}
-              />
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-slate-400">No tracks found matching your search.</p>
-        )}
+        <h2 className="mb-4 text-xl font-bold">Tracks</h2>
+        <div className="grid gap-3 lg:grid-cols-2">
+          {tracks.map((track) => (
+            <TrackCard artistName={track.artistName ?? "Unknown artist"} key={track.id} onSelect={targetPlaylistId ? handleSelect : undefined} track={track} />
+          ))}
+        </div>
       </section>
     </MainAppLayout>
   );
 }
 
 export default function MusicPage() {
-  return (
-    <Suspense fallback={<MainAppLayout>Loading music...</MainAppLayout>}>
-      <MusicPageContent />
-    </Suspense>
-  );
+  return <Suspense fallback={<MainAppLayout>Loading music...</MainAppLayout>}><MusicContent /></Suspense>;
 }

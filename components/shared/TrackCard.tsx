@@ -90,8 +90,12 @@ export function TrackCard({ artistName, contextQueue, onSelect, track }: TrackCa
           {/* اطلاعات مدت زمان و تعداد پخش در سمت راست سطر */}
           <div className="flex items-center gap-3 shrink-0 text-xs text-white/40 font-medium sm:text-right">
             <span>{formatDuration(track.durationSeconds)}</span>
-            <span className="text-[10px] opacity-40">•</span>
-            <span>{formatNumber(track.playCount)} plays</span>
+            {typeof track.playCount === "number" ? (
+              <>
+                <span className="text-[10px] opacity-40">•</span>
+                <span>{formatNumber(track.playCount)} plays</span>
+              </>
+            ) : null}
           </div>
         </div>
 

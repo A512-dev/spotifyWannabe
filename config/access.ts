@@ -9,7 +9,7 @@ export const ROUTE_ACCESS_RULES: RouteAccessRule[] = [
   },
   {
     path: "/support",
-    allowedRoles: ["support", "admin"]
+    allowedRoles: ["listener", "artist", "support", "admin"]
   },
   {
     path: "/admin",

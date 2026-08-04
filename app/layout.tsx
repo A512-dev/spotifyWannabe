@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "SpotifyWannaBe",
-  description: "Phase 1 frontend foundation for a Spotify-like streaming app."
+  description: "Full-stack Spotify-like streaming service built with Next.js and Django REST Framework."
 };
 
 export default function RootLayout({

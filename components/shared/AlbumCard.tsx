@@ -1,7 +1,6 @@
 'use client';
 
 import { useRouter } from "next/navigation";
-import { Card } from "@/components/ui/Card";
 import { formatDate } from "@/lib/formatters";
 import type { Album } from "@/types/domain";
 
