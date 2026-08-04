@@ -34,10 +34,14 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "corsheaders",
     "rest_framework",
+    "rest_framework.authtoken",
     "common",
+    "accounts.apps.AccountsConfig",
     "artists",
     "support",
     "operations.apps.OperationsConfig",
+    "subscriptions.apps.SubscriptionsConfig",
+    "notifications.apps.NotificationsConfig",
     "reports",
 ]
 
@@ -125,6 +129,7 @@ CORS_URLS_REGEX = r"^/api/.*$"
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.SessionAuthentication",
+        "rest_framework.authentication.TokenAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
@@ -137,3 +142,6 @@ REST_FRAMEWORK = {
         "rest_framework.renderers.BrowsableAPIRenderer",
     ],
 }
+
+EMAIL_BACKEND = os.getenv("DJANGO_EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+DEFAULT_FROM_EMAIL = os.getenv("DJANGO_DEFAULT_FROM_EMAIL", "noreply@soundwave.local")

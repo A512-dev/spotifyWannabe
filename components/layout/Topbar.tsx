@@ -4,8 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ACCOUNT_NAVIGATION } from "@/config/navigation";
 import { Avatar } from "@/components/ui/Avatar";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
 import { filterNavigationForUser } from "@/lib/permissions";
 import { getRoleLabel, getSubscriptionLabel } from "@/lib/labels";
 import { useAuth } from "@/providers/AuthProvider";
@@ -18,8 +16,8 @@ export function Topbar() {
   }
 
   const accountLinks = filterNavigationForUser(ACCOUNT_NAVIGATION, currentUser);
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     router.push("/login");
   };
 

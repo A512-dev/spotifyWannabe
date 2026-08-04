@@ -63,7 +63,7 @@ function MusicPageContent() {
         }
 
         if (sortBy === "most_played") {
-          return second.playCount - first.playCount;
+          return (second.playCount ?? 0) - (first.playCount ?? 0);
         }
 
         return 0;

@@ -241,7 +241,7 @@ export default function ArtistDashboardPage() {
     return artistRevenueRecords.filter((record) => record.artistId === currentArtist.id);
   }, [currentArtist]);
 
-  const totalStreams = artistTracks.reduce((sum, track) => sum + track.playCount, 0);
+  const totalStreams = artistTracks.reduce((sum, track) => sum + (track.playCount ?? 0), 0);
   const totalRevenueCents = artistRevenue.reduce((sum, record) => sum + record.netRevenueCents, 0);
   const existingArtistAlbumIds = new Set(artistAlbums.map((album) => album.id));
   const localAlbumIds = artistTracks.reduce<string[]>((albumIds, track) => {
@@ -872,7 +872,7 @@ export default function ArtistDashboardPage() {
                     {catalogReleaseGroups.map((release) => {
                       const isAlbum = release.releaseType === "album";
                       const releaseStatus = release.tracks.some((track) => track.localStatus === "draft") ? "draft" : "published";
-                      const releaseStreams = release.tracks.reduce((sum, track) => sum + track.playCount, 0);
+                      const releaseStreams = release.tracks.reduce((sum, track) => sum + (track.playCount ?? 0), 0);
                       const releaseDurationSeconds = release.tracks.reduce((sum, track) => sum + track.durationSeconds, 0);
                       const releaseTrackIds = release.tracks.map((track) => track.id);
 
@@ -940,7 +940,7 @@ export default function ArtistDashboardPage() {
                                   <span>
                                     <Badge tone={track.localStatus === "published" ? "success" : "warning"}>{track.localStatus}</Badge>
                                   </span>
-                                  <span>{formatNumber(track.playCount)}</span>
+                                  <span>{formatNumber(track.playCount ?? 0)}</span>
                                 </div>
                               ))}
                             </div>
