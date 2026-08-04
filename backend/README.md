@@ -73,10 +73,10 @@ python manage.py check
 python manage.py test -v 2
 ```
 
-Validated result on the Phase 2 branch:
+Validated result on the delivery version:
 
 ```text
-Found 108 test(s).
+Found 115 test(s).
 ...
 OK
 ```
@@ -124,16 +124,24 @@ Backend permissions enforce both role-based and subscription-based restrictions.
 
 ## Subscription Processing
 
-Run periodically:
+Subscription status is refreshed whenever the user accesses subscription-aware APIs or
+their notifications. This automatically expires ended subscriptions and creates one
+deduplicated seven-day warning notification. For an additional deployment-level sweep,
+the same idempotent service can also be run periodically with:
 
 ```powershell
 python manage.py process_subscription_expiry
 ```
 
-This command expires ended subscriptions and creates seven-day warning notifications.
+The command is safe to repeat.
 
 ## Reports and Accounting
 
-Aggregated values are calculated in the backend. The frontend receives prepared totals and counts instead of raw lists.
+Aggregated values are calculated in the backend. The frontend receives prepared totals and counts instead of raw lists. Administrator reports include the active Basic/Silver/Gold distribution and successfully verified subscription sales for the selected period (the current month by default).
 
-Artist revenue records can be generated from counted stream events, viewed by the relevant roles, and marked as settled only by the administrator.
+Artist revenue records can be generated from server-verified counted stream events through the administrator dashboard, viewed by the relevant roles, and marked as settled only by the administrator. Unique listeners are calculated from distinct stream-event listeners for each report period.
+
+## Optional Delivery Features
+
+- Docker Compose runs PostgreSQL, Django/Gunicorn, and the production Next.js application.
+- The home API returns deterministic, content-based recommendations using listening-history artist and genre affinity; popularity is only a stable tie-breaker and cold-start fallback.

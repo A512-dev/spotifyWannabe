@@ -3,7 +3,7 @@ from __future__ import annotations
 from django.contrib.auth import get_user_model
 from django.dispatch import receiver
 
-from artists.signals import artist_application_reviewed
+from artists.signals import artist_application_reviewed, artist_application_submitted
 from common.permissions import user_in_group
 from notifications.models import NotificationType
 from notifications.services import create_notification
@@ -11,6 +11,27 @@ from reports.signals import artist_revenue_record_created, artist_revenue_record
 from support.signals import ticket_created, ticket_message_added, ticket_status_changed
 
 User = get_user_model()
+
+
+@receiver(artist_application_submitted)
+def notify_staff_about_artist_application(
+    sender,
+    application_id,
+    applicant_id,
+    stage_name,
+    **kwargs,
+):
+    staff_users = User.objects.filter(is_active=True).filter(
+        models_q(is_superuser=True) | models_q(groups__name="support")
+    ).distinct()
+    for user in staff_users:
+        create_notification(
+            recipient_id=user.pk,
+            type=NotificationType.ARTIST,
+            title="New artist application",
+            message=f"{stage_name} submitted an artist verification request.",
+            action_href=f"/support?application={application_id}",
+        )
 
 
 @receiver(artist_application_reviewed)

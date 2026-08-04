@@ -7,6 +7,7 @@ from django.db import transaction
 from rest_framework import serializers
 
 from artists.models import ArtistApplication, ArtistProfile, ArtistSampleWork
+from artists.signals import artist_application_submitted
 
 ALLOWED_SAMPLE_EXTENSIONS = {
     ".flac",
@@ -198,6 +199,14 @@ class ArtistApplicationCreateSerializer(serializers.ModelSerializer):
                 external_url=sample_url,
             )
 
+        transaction.on_commit(
+            lambda: artist_application_submitted.send(
+                sender=ArtistApplication,
+                application_id=application.pk,
+                applicant_id=application.applicant_id,
+                stage_name=application.stage_name,
+            )
+        )
         return application
 
     def to_representation(self, instance):

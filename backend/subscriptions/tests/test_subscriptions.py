@@ -1,12 +1,15 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from subscriptions.models import PaymentStatus, PaymentTransaction, UserSubscription
+from notifications.models import Notification
+from operations.models import SubscriptionPlan
+from subscriptions.models import PaymentStatus, PaymentTransaction, SubscriptionStatus, UserSubscription
 from subscriptions.services import add_calendar_months
 
 User = get_user_model()
@@ -64,3 +67,35 @@ class SubscriptionApiTests(APITestCase):
         value = datetime(2026, 1, 31, 12, 0, tzinfo=ZoneInfo("UTC"))
         shifted = add_calendar_months(value, 1)
         self.assertEqual((shifted.year, shifted.month, shifted.day), (2026, 2, 28))
+
+    def test_notification_request_processes_expiry_and_warning_automatically(self):
+        gold = SubscriptionPlan.objects.get(tier="gold")
+        expired = UserSubscription.objects.create(
+            user=self.user,
+            plan=gold,
+            starts_at=timezone.now() - timedelta(days=40),
+            ends_at=timezone.now() - timedelta(minutes=1),
+            status=SubscriptionStatus.ACTIVE,
+        )
+        response = self.client.get(reverse("notifications:notification-list"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        expired.refresh_from_db()
+        self.assertEqual(expired.status, SubscriptionStatus.EXPIRED)
+
+        expiring = UserSubscription.objects.create(
+            user=self.user,
+            plan=gold,
+            starts_at=timezone.now() - timedelta(days=20),
+            ends_at=timezone.now() + timedelta(days=3),
+            status=SubscriptionStatus.ACTIVE,
+        )
+        self.client.get(reverse("notifications:notification-list"))
+        self.client.get(reverse("notifications:notification-list"))
+        self.assertEqual(
+            Notification.objects.filter(
+                recipient=self.user,
+                title="Subscription expiring soon",
+                message__contains=expiring.ends_at.date().isoformat(),
+            ).count(),
+            1,
+        )

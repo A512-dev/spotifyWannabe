@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date
 
 from django.db.models import Count, Q
+from django.utils import timezone
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -15,7 +16,7 @@ from music.serializers import (
     AlbumSerializer, AlbumWriteSerializer, GenreSerializer, ListeningHistorySerializer,
     StreamCreateSerializer, StreamEventSerializer, TrackSerializer, TrackWriteSerializer,
 )
-from music.services import can_access_track, register_stream, track_statistics
+from music.services import can_access_track, recommend_tracks, register_stream, track_statistics
 from operations.models import SubscriptionTier
 from subscriptions.services import get_current_subscription_tier
 
@@ -40,13 +41,14 @@ class AlbumViewSet(viewsets.ModelViewSet):
             return queryset
         tier = get_current_subscription_tier(self.request.user)
         profile = getattr(self.request.user, "artist_profile", None)
-        public_filter = Q(
-            status=ReleaseStatus.PUBLISHED,
-            release_date__lte=date.today(),
-            is_early_access=False,
-        )
+        today = timezone.localdate()
+        public_filter = Q(status=ReleaseStatus.PUBLISHED, release_date__lte=today)
         if tier == SubscriptionTier.GOLD:
-            public_filter |= Q(status=ReleaseStatus.PUBLISHED, is_early_access=True)
+            public_filter |= Q(
+                status=ReleaseStatus.PUBLISHED,
+                release_date__gt=today,
+                is_early_access=True,
+            )
         if profile:
             public_filter |= Q(artist=profile)
         queryset = queryset.filter(public_filter).distinct()
@@ -75,13 +77,14 @@ class TrackViewSet(viewsets.ModelViewSet):
             return queryset
         tier = get_current_subscription_tier(self.request.user)
         profile = getattr(self.request.user, "artist_profile", None)
-        visible = Q(
-            status=ReleaseStatus.PUBLISHED,
-            release_date__lte=date.today(),
-            is_early_access=False,
-        )
+        today = timezone.localdate()
+        visible = Q(status=ReleaseStatus.PUBLISHED, release_date__lte=today)
         if tier == SubscriptionTier.GOLD:
-            visible |= Q(status=ReleaseStatus.PUBLISHED, is_early_access=True)
+            visible |= Q(
+                status=ReleaseStatus.PUBLISHED,
+                release_date__gt=today,
+                is_early_access=True,
+            )
         if profile:
             visible |= Q(artist=profile)
         queryset = queryset.filter(visible).distinct()
@@ -151,7 +154,15 @@ class HomeViewSet(viewsets.ViewSet):
         latest = visible_tracks.order_by("-release_date")[:10]
         trending = visible_tracks.order_by("-play_count")[:10]
         recent_history = ListeningHistory.objects.filter(listener=request.user).select_related("track", "track__artist")[:10]
-        early_access = visible_tracks.filter(is_early_access=True).order_by("release_date")[:10]
+        early_access = visible_tracks.filter(
+            is_early_access=True,
+            release_date__gt=timezone.localdate(),
+        ).order_by("release_date")[:10]
+        recommendations = recommend_tracks(
+            user=request.user,
+            visible_tracks=visible_tracks,
+            limit=10,
+        )
         from playlists.models import PlaylistPlayback
         from playlists.serializers import PlaylistPlaybackSerializer
         recent_playlists = PlaylistPlayback.objects.filter(user=request.user).select_related(
@@ -166,6 +177,16 @@ class HomeViewSet(viewsets.ViewSet):
             "latestTracks": TrackSerializer(latest, many=True, context={"request": request}).data,
             "trendingTracks": TrackSerializer(trending, many=True, context={"request": request}).data,
             "earlyAccessTracks": TrackSerializer(early_access, many=True, context={"request": request}).data,
+            "recommendedTracks": [
+                {
+                    "track": TrackSerializer(
+                        recommendation["track"],
+                        context={"request": request},
+                    ).data,
+                    "reason": recommendation["reason"],
+                }
+                for recommendation in recommendations
+            ],
             "recentlyPlayed": ListeningHistorySerializer(recent_history, many=True, context={"request": request}).data,
             "recentlyPlayedPlaylists": PlaylistPlaybackSerializer(
                 recent_playlists, many=True, context={"request": request}

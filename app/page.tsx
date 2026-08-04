@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { MainAppLayout } from "@/components/layout/MainAppLayout";
 import { AlbumCard, PageHeader, PlaylistCard, TrackCard } from "@/components/shared";
 import { Button } from "@/components/ui";
-import { musicApi, type PlaylistPlaybackEntry } from "@/features/music/api";
+import { musicApi, type PlaylistPlaybackEntry, type RecommendationEntry } from "@/features/music/api";
 import { useAuth } from "@/providers";
 import type { Album, Track } from "@/types/domain";
 
@@ -16,6 +16,7 @@ export default function HomePage() {
   const [trending, setTrending] = useState<Track[]>([]);
   const [latest, setLatest] = useState<Track[]>([]);
   const [earlyAccess, setEarlyAccess] = useState<Track[]>([]);
+  const [recommendations, setRecommendations] = useState<RecommendationEntry[]>([]);
   const [recentTracks, setRecentTracks] = useState<Track[]>([]);
   const [recentPlaylists, setRecentPlaylists] = useState<PlaylistPlaybackEntry[]>([]);
   const [albums, setAlbums] = useState<Album[]>([]);
@@ -27,6 +28,7 @@ export default function HomePage() {
         setTrending(home.trendingTracks.slice(0, 6));
         setLatest(home.latestTracks.slice(0, 6));
         setEarlyAccess(home.earlyAccessTracks.slice(0, 6));
+        setRecommendations(home.recommendedTracks.slice(0, 6));
         setRecentTracks(home.recentlyPlayed.map((entry) => entry.track).slice(0, 6));
         setRecentPlaylists(home.recentlyPlayedPlaylists.slice(0, 6));
         setAlbums(albumResponse.results.slice(0, 4));
@@ -49,6 +51,14 @@ export default function HomePage() {
 
       {recentPlaylists.length ? <section className="mt-8"><h2 className="mb-4 text-xl font-bold text-white">Recently played playlists</h2><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{recentPlaylists.map((entry) => <Link href="/playlists" key={entry.playlist.id}><PlaylistCard playlist={entry.playlist} /></Link>)}</div></section> : null}
       {trackSection("Recently played", recentTracks)}
+      {recommendations.length ? (
+        <section className="mt-8">
+          <div className="mb-4 flex items-center justify-between"><div><h2 className="text-xl font-bold text-white">Made for you</h2><p className="mt-1 text-sm text-white/50">Deterministic suggestions based on your listening history.</p></div><Link className="text-sm font-semibold text-white/70 hover:text-white" href="/music">View all</Link></div>
+          <div className="grid gap-3 lg:grid-cols-2">
+            {recommendations.map((entry) => <div key={entry.track.id}><p className="mb-1 px-1 text-xs text-brand-secondary">{entry.reason}</p><TrackCard artistName={entry.track.artistName ?? "Unknown artist"} track={entry.track} /></div>)}
+          </div>
+        </section>
+      ) : null}
       {currentUser?.subscriptionTier === "gold" ? trackSection("Gold early access", earlyAccess) : null}
       {trackSection("Trending tracks", trending)}
       {trackSection("Latest tracks", latest)}

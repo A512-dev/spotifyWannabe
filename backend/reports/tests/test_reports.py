@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timedelta
 from unittest.mock import Mock
 
 from django.contrib.auth import get_user_model
@@ -15,6 +15,12 @@ from artists.models import ArtistApplication, ArtistProfile
 from music.models import StreamEvent, Track
 from reports.models import ArtistRevenueRecord, PaymentStatus
 from reports.signals import artist_revenue_record_settled
+from subscriptions.models import (
+    PaymentStatus as SubscriptionPaymentStatus,
+    PaymentTransaction,
+    UserSubscription,
+)
+from operations.models import SubscriptionPlan
 from support.models import Ticket, TicketMessage, TicketPriority, TicketStatus
 
 User = get_user_model()
@@ -249,6 +255,46 @@ class OperationalReportsApiTests(APITestCase):
             response.data["accounting"]["currencyBreakdown"][0]["artistPayoutCents"],
             5760,
         )
+
+    def test_admin_overview_reports_subscription_distribution_and_sales(self) -> None:
+        silver = SubscriptionPlan.objects.get(tier="silver")
+        gold = SubscriptionPlan.objects.get(tier="gold")
+        now = timezone.now()
+        UserSubscription.objects.create(
+            user=self.regular_user,
+            plan=silver,
+            starts_at=now - timedelta(days=1),
+            ends_at=now + timedelta(days=30),
+            status="active",
+        )
+        UserSubscription.objects.create(
+            user=self.artist_user,
+            plan=gold,
+            starts_at=now - timedelta(days=1),
+            ends_at=now + timedelta(days=30),
+            status="active",
+        )
+        PaymentTransaction.objects.create(
+            user=self.regular_user,
+            plan=silver,
+            months=1,
+            amount_cents=1200,
+            currency="USD",
+            status=SubscriptionPaymentStatus.SUCCESS,
+            verified_at=timezone.make_aware(datetime(2026, 5, 10, 12, 0)),
+        )
+        self.client.force_authenticate(user=self.admin_user)
+        response = self.client.get(
+            reverse("reports:admin-overview"),
+            {"periodStart": "2026-05-01", "periodEnd": "2026-05-31"},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["subscriptions"]["distribution"]["silver"], 1)
+        self.assertEqual(response.data["subscriptions"]["distribution"]["gold"], 1)
+        self.assertEqual(response.data["subscriptions"]["distribution"]["basic"], 1)
+        sales = response.data["subscriptions"]["sales"]
+        self.assertEqual(sales["transactionCount"], 1)
+        self.assertEqual(sales["currencyBreakdown"][0]["revenueCents"], 1200)
 
     def test_invalid_report_period_is_rejected(self) -> None:
         self.client.force_authenticate(user=self.admin_user)

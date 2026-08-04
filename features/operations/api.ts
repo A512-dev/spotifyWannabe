@@ -53,6 +53,21 @@ export interface RevenueRecordApi {
   settledAt?: string;
 }
 
+export interface ApprovedArtistApi {
+  id: string;
+  stageName: string;
+}
+
+export interface RevenueGenerationInput {
+  artistId: string;
+  periodStart: string;
+  periodEnd: string;
+  currency: "USD" | "EUR" | "IRR";
+  perStreamCents: number;
+  perUniqueListenerCents: number;
+  platformFeePercent: number;
+}
+
 
 export const operationsApi = {
   listApplications(params: { status?: string; search?: string } = {}) {
@@ -91,6 +106,12 @@ export const operationsApi = {
   listRevenue() {
     return apiRequest<PaginatedResponse<RevenueRecordApi>>("/reports/artist-revenue/");
   },
+  generateRevenue(input: RevenueGenerationInput) {
+    return apiRequest<RevenueRecordApi>("/reports/artist-revenue/generate/", {
+      method: "POST",
+      body: JSON.stringify(input)
+    });
+  },
   settleRevenue(id: string) {
     return apiRequest<RevenueRecordApi>(`/reports/artist-revenue/${id}/settle/`, { method: "POST" });
   },
@@ -102,6 +123,9 @@ export const operationsApi = {
   },
   artistOverview() {
     return apiRequest<ArtistOverviewApi>("/reports/artist/overview/");
+  },
+  listApprovedArtists() {
+    return apiRequest<PaginatedResponse<ApprovedArtistApi>>("/artists/profiles/");
   },
   listSubscriptionPlans() {
     return planApi.list();
@@ -144,6 +168,27 @@ export interface AdminOverviewApi {
   artists: {
     approved: number;
     pendingApplications: number;
+  };
+  subscriptions: {
+    distribution: {
+      basic: number;
+      silver: number;
+      gold: number;
+      total: number;
+    };
+    sales: {
+      transactionCount: number;
+      currencyBreakdown: Array<{
+        currency: "USD" | "EUR" | "IRR";
+        revenueCents: number;
+        transactionCount: number;
+      }>;
+      tierBreakdown: Array<{
+        tier: "silver" | "gold";
+        revenueCents: number;
+        transactionCount: number;
+      }>;
+    };
   };
   support: SupportOverviewApi;
   generatedAt: string;

@@ -5,6 +5,7 @@ from PIL import Image
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.exceptions import ValidationError
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -33,6 +34,8 @@ class AccountsApiTests(APITestCase):
         self.assertTrue(response.data["token"])
         self.assertEqual(response.data["user"]["displayName"], "Listener")
         self.assertEqual(response.data["user"]["subscriptionTier"], "basic")
+        self.assertEqual(response.data["user"]["birthDate"], "2002-01-02")
+        self.assertEqual(response.data["user"]["gender"], "prefer_not_to_say")
 
     def test_duplicate_email_is_rejected(self):
         self.client.post(reverse("accounts:register-listener"), self.listener_payload(), format="json")
@@ -130,3 +133,16 @@ class AccountsApiTests(APITestCase):
             format="multipart",
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_only_one_active_system_administrator_is_allowed(self):
+        User.objects.create_superuser(
+            username="primary-admin",
+            email="primary-admin@example.com",
+            password="Strong-pass-123",
+        )
+        with self.assertRaises(ValidationError):
+            User.objects.create_superuser(
+                username="second-admin",
+                email="second-admin@example.com",
+                password="Strong-pass-123",
+            )

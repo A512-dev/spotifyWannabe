@@ -10,9 +10,9 @@ The project was divided by feature ownership so that each member had a clear res
 
 | Team member | Phase 1 responsibilities | Phase 2 responsibilities |
 |---|---|---|
-| Arshia | Home, login, signup, forgot password, profile, settings, notifications | Accounts, authentication, user profiles, preferences, follows, notifications, subscriptions, payment flow, and related frontend integration |
-| Mira | Music catalog, album pages, playlists, player | Music and album models, media upload, playlists, stream registration, listening history, subscription limits, and related frontend integration |
-| Poorya Amirniya | Artist dashboard, support dashboard, admin dashboard | Backend bootstrap, artist applications and approvals, support tickets, dynamic subscription pricing, artist accounting, operational reports, settlement flow, and related frontend integration |
+| Arshia Vashani - 400108728 | Home, login, signup, forgot password, profile, settings, notifications | Accounts, authentication, user profiles, preferences, follows, notifications, subscriptions, payment flow, and related frontend integration |
+| Narges Sepehri (Mira) - 401106028 | Music catalog, album pages, playlists, player | Music and album models, media upload, playlists, stream registration, listening history, subscription limits, and related frontend integration |
+| Poorya Amirniya - 401170518 | Artist dashboard, support dashboard, admin dashboard | Backend bootstrap, artist applications and approvals, support tickets, dynamic subscription pricing, artist accounting, operational reports, settlement flow, and related frontend integration |
 
 Shared contracts, integration work, testing, and final validation were reviewed across the team.
 
@@ -28,18 +28,20 @@ Shared contracts, integration work, testing, and final validation were reviewed 
 - MP3, WAV, FLAC, cover image, avatar, and portfolio uploads
 - Searchable music catalog and album detail pages
 - Music player with queue, progress, volume, repeat, shuffle, and lyrics
-- Stream registration after the required listening duration
+- Server-verified stream sessions after the required listening duration
 - Listening history
+- Deterministic music recommendations based on listening history, artists, and genres
 - Playlist creation, editing, ordering, and subscription-based limits
 - Basic, Silver, and Gold subscriptions
 - One-, three-, six-, and twelve-month billing periods
 - Dynamic Silver and Gold pricing controlled by the administrator
 - Local payment sandbox and optional Zarinpal adapter
-- Persistent notifications
+- Persistent role-aware notifications, including new artist applications and subscription expiry
 - Support tickets with replies, internal notes, assignment, priority, and status transitions
-- Aggregated artist, support, and administrator reports
+- Aggregated artist, support, and administrator reports, including subscription distribution and verified sales
 - Stream-based artist accounting and administrator settlement confirmation
 - Role-based and subscription-based access control
+- Docker Compose deployment for the frontend, backend, and PostgreSQL
 
 ## Technology Stack
 
@@ -185,6 +187,27 @@ Frontend:
 http://localhost:3000
 ```
 
+### Docker Compose
+
+Docker starts PostgreSQL, the Django backend, and the production Next.js frontend together:
+
+```powershell
+docker compose up --build
+```
+
+Open `http://localhost:3000`. The API is exposed at `http://localhost:8000/api`.
+Database and uploaded media are stored in named Docker volumes. Stop the containers with:
+
+```powershell
+docker compose down
+```
+
+Create the single system administrator after the containers are running:
+
+```powershell
+docker compose exec backend python manage.py createsuperuser
+```
+
 ## Verification
 
 ### Frontend
@@ -196,12 +219,14 @@ npm run test
 npm run build
 ```
 
-Validated on the Phase 2 branch:
+Validated on the delivery version:
 
-- 25 frontend tests passed
-- TypeScript type-check passed
-- ESLint passed
-- Next.js production build passed
+```text
+29 tests passed
+TypeScript type-check passed
+ESLint passed
+Next.js production build passed (15 generated routes)
+```
 
 ### Backend
 
@@ -212,11 +237,14 @@ python manage.py check
 python manage.py test -v 2
 ```
 
-Validated on the Phase 2 branch:
+Validated on the delivery version:
 
-- No pending model changes
-- Django system check passed
-- 108 backend tests passed
+```text
+Found 115 test(s).
+No changes detected
+System check identified no issues
+OK
+```
 
 ## Roles and Access Control
 
@@ -225,7 +253,7 @@ Validated on the Phase 2 branch:
 - **Support:** artist application review and support ticket management
 - **Administrator:** pricing, reports, accounting, settlements, and all support capabilities
 
-Administrator access uses Django superuser status. Support access uses membership in the `support` group. Artist access requires an approved artist profile.
+Administrator access uses Django superuser status and the backend enforces at most one active superuser. Support access uses membership in the `support` group. Artist access requires an approved artist profile.
 
 Security-sensitive access checks are enforced by the backend.
 
@@ -266,9 +294,9 @@ The optional Zarinpal adapter can be enabled through `backend/.env`.
 - `/api/reports/`
 - `/api/operations/`
 
-## Scheduled Subscription Processing
+## Subscription Lifecycle Processing
 
-Run periodically to expire ended subscriptions and create seven-day expiry warnings:
+Subscription state is refreshed automatically when subscription-dependent data or notifications are requested. This makes expiry and seven-day warnings work during normal application use without an external scheduler. The idempotent management command remains available for a daily production schedule:
 
 ```powershell
 cd backend
@@ -285,6 +313,9 @@ docs/phase2-report-draft.md
 
 The final group report must be reviewed by all team members and exported as PDF before submission.
 
-## Optional Items
+## Optional Items Implemented
 
-Dockerization and the optional bonus feature are not included in the current required implementation.
+- Dockerization: `docker compose up --build` starts PostgreSQL, Django, and Next.js.
+- Selected bonus activity: a deterministic, non-random music recommender. Artist affinity has the highest weight, genre affinity has the second-highest weight, and counted popularity is used only as a tie-breaker and cold-start fallback. Already-listened tracks are excluded from the recommendation candidates.
+
+The legacy `data/` fixtures and `lib/auth.ts` are retained only for isolated Phase 1 regression tests. Runtime authentication, catalogs, playlists, and dashboards use the Django REST API.

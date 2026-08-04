@@ -14,6 +14,7 @@ from rest_framework.test import APITestCase
 
 from artists.models import ArtistApplication, ArtistProfile
 from artists.signals import artist_application_reviewed
+from notifications.models import Notification
 
 User = get_user_model()
 TEST_MEDIA_ROOT = tempfile.mkdtemp(prefix="soundwave-test-media-")
@@ -85,6 +86,17 @@ class ArtistApplicationApiTests(APITestCase):
         self.assertEqual(application.applicant, self.applicant)
         self.assertEqual(application.status, "pending")
         self.assertEqual(application.samples.count(), 1)
+
+    def test_new_application_notifies_support_and_administrator(self) -> None:
+        with self.captureOnCommitCallbacks(execute=True):
+            application = self.create_application()
+        recipients = set(
+            Notification.objects.filter(
+                title="New artist application",
+                action_href=f"/support?application={application.pk}",
+            ).values_list("recipient_id", flat=True)
+        )
+        self.assertEqual(recipients, {self.support_user.pk, self.admin_user.pk})
 
     def test_application_requires_at_least_one_sample(self) -> None:
         self.client.force_authenticate(user=self.applicant)

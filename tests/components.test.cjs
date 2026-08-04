@@ -3,7 +3,7 @@ const test = require("node:test");
 const React = require("react");
 const { renderToStaticMarkup } = require("react-dom/server");
 const { AuthProvider } = require('../providers/AuthProvider');
-const { PageHeader, TrackCard, AlbumCard, EmptyState } = require("@/components/shared");
+const { PageHeader, TrackCard, AlbumCard, EmptyState, SubscriptionDistributionChart } = require("@/components/shared");
 const { Badge, Button, Table } = require("@/components/ui");
 const { albums } = require("@/data/albums");
 const { artists } = require("@/data/artists");
@@ -82,6 +82,19 @@ test("renders table empty messages", () => {
   );
 
   assert.match(html, /No tracks found\./);
+});
+
+test("renders backend subscription distribution as a labeled chart", () => {
+  const html = render(
+    React.createElement(SubscriptionDistributionChart, {
+      distribution: { basic: 6, silver: 3, gold: 1, total: 10 }
+    })
+  );
+
+  assert.match(html, /Subscription distribution for 10 users/);
+  assert.match(html, /Basic/);
+  assert.match(html, /60%/);
+  assert.match(html, /Gold/);
 });
 
 test("renders track cards with artist links and play metadata", () => {

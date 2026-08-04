@@ -5,5 +5,5 @@ export * from "@/components/shared/NotificationCard";
 export * from "@/components/shared/PageHeader";
 export * from "@/components/shared/PlaylistCard";
 export * from "@/components/shared/StatCard";
+export * from "@/components/shared/SubscriptionDistributionChart";
 export * from "@/components/shared/TrackCard";
-
