@@ -30,7 +30,7 @@ export const SIDEBAR_NAVIGATION: NavigationItem[] = [
     label: "Support",
     href: "/support",
     description: "Support ticket workspace.",
-    allowedRoles: ["support", "admin"]
+    allowedRoles: ["listener", "artist", "support", "admin"]
   },
   {
     label: "Admin",

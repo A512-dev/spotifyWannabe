@@ -1,6 +1,6 @@
 # SoundWave Frontend Foundation
 
-SoundWave is a Phase 1 frontend foundation for a Spotify-like streaming app built with Next.js App Router, React, TypeScript, and Tailwind CSS. This repository intentionally focuses on shared architecture, typed contracts, mock data, reusable UI, layouts, providers, and route skeletons instead of full business-page implementation.
+SoundWave is a full-stack Spotify-like streaming service for a Spotify-like streaming app built with Next.js App Router, React, TypeScript, and Tailwind CSS. The Next.js frontend is integrated with a Django REST Framework backend for accounts, subscriptions, music, playlists, support, artist operations, notifications, payments, and reporting.
 
 ## Architecture
 
@@ -69,3 +69,8 @@ npm install
 npm run type-check
 npm run dev
 ```
+
+
+## Phase 2 local run
+
+Start the Django API from `backend` on port 8000, then start Next.js on port 3000. Copy `.env.local.example` to `.env.local` when a different API URL is needed. Backend setup and test commands are documented in `backend/README.md`.

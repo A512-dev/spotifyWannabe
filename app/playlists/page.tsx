@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { MainAppLayout } from "@/components/layout/MainAppLayout";
 import { EmptyState, PageHeader, PlaylistCard, TrackCard } from "@/components/shared";

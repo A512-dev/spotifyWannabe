@@ -5,7 +5,18 @@ const eslintConfig = [
   ...nextVitals,
   ...nextTypescript,
   {
-    ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "dist/**", "next-env.d.ts"]
+    ignores: [
+      "node_modules/**",
+      ".next/**",
+      "out/**",
+      "build/**",
+      "dist/**",
+      "next-env.d.ts",
+      "backend/.venv/**",
+      "backend/media/**",
+      "backend/staticfiles/**",
+      "**/__pycache__/**"
+    ]
   },
   {
     files: ["tests/**/*.cjs"],
@@ -22,3 +33,4 @@ const eslintConfig = [
 ];
 
 export default eslintConfig;
+

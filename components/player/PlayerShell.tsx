@@ -5,24 +5,16 @@ import Link from "next/link";
 import { PlayerControlsPlaceholder } from "@/components/player/PlayerControlsPlaceholder";
 import { PlayerTrackSummary } from "@/components/player/PlayerTrackSummary";
 import { musicApi } from "@/features/music/api";
-import { useAuth } from "@/providers";
 import { usePlayer } from "@/providers/PlayerProvider";
 import { formatDuration } from "@/lib/formatters";
 import type { Track } from "@/types/domain";
 
 export function PlayerShell() {
   const { playerState, setPlayerState, tracks } = usePlayer();
-  const { currentUser } = useAuth();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const currentTrack = tracks.find((track) => track.id === playerState.currentTrackId);
   const currentArtist = currentTrack?.artistName ? { stageName: currentTrack.artistName } : null;
-  const streamSessionRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (!streamSessionRef.current) {
-      streamSessionRef.current = `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    }
-  }, [playerState.currentTrackId]);
+  const streamSessionRef = useRef<string>("");
   const streamReportedRef = useRef(false);
 
   const [activeQueue, setActiveQueue] = useState<Track[]>(tracks);
@@ -149,7 +141,7 @@ export function PlayerShell() {
   const reportStream = (seconds: number) => {
     if (!currentTrack || streamReportedRef.current || seconds < 30) return;
     streamReportedRef.current = true;
-    void musicApi.registerStream(currentTrack.id, streamSessionRef.current ?? "", Math.floor(seconds)).catch(() => {
+    void musicApi.registerStream(currentTrack.id, streamSessionRef.current, Math.floor(seconds)).catch(() => {
       streamReportedRef.current = false;
     });
   };

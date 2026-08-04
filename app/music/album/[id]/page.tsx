@@ -32,7 +32,7 @@ export default function AlbumPage({ params }: AlbumPageProps) {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const albumTracks = album?.tracks ?? [];
+  const albumTracks = useMemo(() => album?.tracks ?? [], [album?.tracks]);
   const queueTrackIds = useMemo(() => albumTracks.map((track) => track.id), [albumTracks]);
 
   const playAlbumFrom = async (trackId?: string) => {
