@@ -124,7 +124,7 @@ CORS_ALLOWED_ORIGINS = env_list(
 )
 CSRF_TRUSTED_ORIGINS = env_list(
     "DJANGO_CSRF_TRUSTED_ORIGINS",
-    "http://localhost:3000",
+    "http://localhost:3000,http://localhost:8000",
 )
 CORS_URLS_REGEX = r"^/api/.*$"
 
