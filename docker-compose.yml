@@ -35,11 +35,44 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-soundwave-local-password}
       POSTGRES_PORT: "5432"
       POSTGRES_USER: ${POSTGRES_USER:-soundwave}
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          python -c "import json,urllib.request;
+          data=json.load(urllib.request.urlopen('http://127.0.0.1:8000/api/health/'));
+          assert data.get('status') == 'ok'"
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     volumes:
       - media_data:/app/media
       - static_data:/app/staticfiles
+
+  gateway:
+    image: nginx:1.27-alpine
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8000:80"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          wget -q -O - http://127.0.0.1/api/health/ |
+          grep -q '"status"[[:space:]]*:[[:space:]]*"ok"'
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - media_data:/var/www/media:ro
+      - static_data:/var/www/static:ro
 
   frontend:
     build:
@@ -47,7 +80,8 @@ services:
       args:
         NEXT_PUBLIC_API_BASE_URL: http://localhost:8000/api
     depends_on:
-      - backend
+      gateway:
+        condition: service_healthy
     environment:
       NEXT_PUBLIC_API_BASE_URL: http://localhost:8000/api
     ports:

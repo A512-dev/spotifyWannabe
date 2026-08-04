@@ -1,4 +1,5 @@
 from datetime import timedelta
+from urllib.parse import urlparse
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -78,6 +79,16 @@ class MusicApiTests(APITestCase):
         response = self.client.get(reverse("music:track-list"), {"search": "Neon"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["count"], 1)
+
+    def test_catalog_returns_root_relative_media_url(self):
+        track = self.create_track(title="Media URL Track")
+        self.client.force_authenticate(user=self.listener)
+
+        response = self.client.get(reverse("music:track-list"), {"search": track.title})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        audio_url = response.data["results"][0]["audioUrl"]
+        self.assertEqual(urlparse(audio_url).path, f"/media/{track.audio_file.name}")
 
     def test_basic_user_cannot_see_early_access_track(self):
         self.create_track(title="Early", is_early_access=True, release_date=timezone.localdate() + timedelta(days=2))

@@ -41,7 +41,7 @@ Shared contracts, integration work, testing, and final validation were reviewed 
 - Aggregated artist, support, and administrator reports, including subscription distribution and verified sales
 - Stream-based artist accounting and administrator settlement confirmation
 - Role-based and subscription-based access control
-- Docker Compose deployment for the frontend, backend, and PostgreSQL
+- Docker Compose deployment for the frontend, backend, Nginx media gateway, and PostgreSQL
 
 ## Technology Stack
 
@@ -89,6 +89,7 @@ backend/
   reports/                  Aggregated reports, accounting, and settlements
   common/                   Shared permissions, pagination, errors, and health check
 docs/                       Phase 2 report draft
+docker/                     Nginx reverse-proxy and media-serving configuration
 ```
 
 ## Environment Files
@@ -189,14 +190,21 @@ http://localhost:3000
 
 ### Docker Compose
 
-Docker starts PostgreSQL, the Django backend, and the production Next.js frontend together:
+Docker starts PostgreSQL, the Django backend, the Nginx API/media gateway, and the production Next.js frontend together:
 
 ```powershell
 docker compose up --build
 ```
 
-Open `http://localhost:3000`. The API is exposed at `http://localhost:8000/api`.
-Database and uploaded media are stored in named Docker volumes. Stop the containers with:
+Open `http://localhost:3000`. Nginx exposes the API at `http://localhost:8000/api`, uploaded files at `http://localhost:8000/media`, and Django administration at `http://localhost:8000/admin/`.
+
+Confirm that all four services are running and healthy:
+
+```powershell
+docker compose ps
+```
+
+The expected services are `database`, `backend`, `gateway`, and `frontend`. Nginx serves uploaded audio and images from the shared media volume and supports browser byte-range requests used while seeking through audio. Database and uploaded media are stored in named Docker volumes. Stop the containers without deleting those volumes:
 
 ```powershell
 docker compose down
@@ -240,7 +248,7 @@ python manage.py test -v 2
 Validated on the delivery version:
 
 ```text
-Found 115 test(s).
+Found 116 test(s).
 No changes detected
 System check identified no issues
 OK
@@ -315,7 +323,7 @@ The final group report must be reviewed by all team members and exported as PDF 
 
 ## Optional Items Implemented
 
-- Dockerization: `docker compose up --build` starts PostgreSQL, Django, and Next.js.
+- Dockerization: `docker compose up --build` starts PostgreSQL, Django/Gunicorn, an Nginx API/media gateway, and Next.js. The gateway serves uploaded files while Django runs with `DEBUG=false`.
 - Selected bonus activity: a deterministic, non-random music recommender. Artist affinity has the highest weight, genre affinity has the second-highest weight, and counted popularity is used only as a tie-breaker and cold-start fallback. Already-listened tracks are excluded from the recommendation candidates.
 
 The legacy `data/` fixtures and `lib/auth.ts` are retained only for isolated Phase 1 regression tests. Runtime authentication, catalogs, playlists, and dashboards use the Django REST API.

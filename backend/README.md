@@ -76,7 +76,7 @@ python manage.py test -v 2
 Validated result on the delivery version:
 
 ```text
-Found 115 test(s).
+Found 116 test(s).
 ...
 OK
 ```
@@ -97,7 +97,7 @@ Uploaded files are stored under:
 backend/media/
 ```
 
-When `DEBUG=true`, Django serves local media files during development.
+When `DEBUG=true`, Django serves local media files during development. In the Docker deployment, Nginx serves `/media/` and `/static/` from shared named volumes while Django runs with `DEBUG=false`.
 
 ## Authentication and Roles
 
@@ -143,5 +143,5 @@ Artist revenue records can be generated from server-verified counted stream even
 
 ## Optional Delivery Features
 
-- Docker Compose runs PostgreSQL, Django/Gunicorn, and the production Next.js application.
+- Docker Compose runs PostgreSQL, Django/Gunicorn, the Nginx API/media gateway, and the production Next.js application.
 - The home API returns deterministic, content-based recommendations using listening-history artist and genre affinity; popularity is only a stable tie-breaker and cold-start fallback.
