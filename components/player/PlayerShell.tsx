@@ -4,21 +4,26 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { PlayerControlsPlaceholder } from "@/components/player/PlayerControlsPlaceholder";
 import { PlayerTrackSummary } from "@/components/player/PlayerTrackSummary";
-import { albums } from "@/data/albums";
-import { artists } from "@/data/artists";
-import { tracks } from "@/data/tracks";
+import { musicApi } from "@/features/music/api";
 import { useAuth } from "@/providers";
 import { usePlayer } from "@/providers/PlayerProvider";
-import { formatNumber, formatDuration } from "@/lib/formatters";
+import { formatDuration } from "@/lib/formatters";
 import type { Track } from "@/types/domain";
 
 export function PlayerShell() {
-  const { playerState, setPlayerState } = usePlayer();
+  const { playerState, setPlayerState, tracks } = usePlayer();
   const { currentUser } = useAuth();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const currentTrack = tracks.find((track) => track.id === playerState.currentTrackId);
-  const currentArtist = currentTrack ? artists.find((a) => a.id === currentTrack.artistId) : null;
-  const currentAlbum = currentTrack ? albums.find((a) => a.id === currentTrack.albumId) : null;
+  const currentArtist = currentTrack?.artistName ? { stageName: currentTrack.artistName } : null;
+  const streamSessionRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!streamSessionRef.current) {
+      streamSessionRef.current = `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    }
+  }, [playerState.currentTrackId]);
+  const streamReportedRef = useRef(false);
 
   const [activeQueue, setActiveQueue] = useState<Track[]>(tracks);
   const [isMobileExpanded, setIsMobileExpanded] = useState(false);
@@ -44,7 +49,7 @@ export function PlayerShell() {
     } else {
       setActiveQueue(tracks);
     }
-  }, [playerState.currentTrackId]);
+  }, [playerState.currentTrackId, tracks]);
 
   const handleNext = useCallback(() => {
     if (!currentTrack) return;
@@ -97,6 +102,8 @@ export function PlayerShell() {
     if (!audio || !currentTrack) return;
     audio.load();
     setProgress(0);
+    streamSessionRef.current = `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    streamReportedRef.current = false;
   }, [currentTrack]);
 
   useEffect(() => {
@@ -139,7 +146,16 @@ export function PlayerShell() {
     setProgress(time);
   };
 
+  const reportStream = (seconds: number) => {
+    if (!currentTrack || streamReportedRef.current || seconds < 30) return;
+    streamReportedRef.current = true;
+    void musicApi.registerStream(currentTrack.id, streamSessionRef.current ?? "", Math.floor(seconds)).catch(() => {
+      streamReportedRef.current = false;
+    });
+  };
+
   const handleAudioEnded = () => {
+    reportStream(audioRef.current?.currentTime ?? currentTrack.durationSeconds);
     if (repeat === "one" && audioRef.current) {
       audioRef.current.currentTime = 0;
       void audioRef.current.play();
@@ -156,13 +172,16 @@ export function PlayerShell() {
 
   const currentIdx = activeQueue.findIndex(t => t.id === currentTrack.id);
   const upcomingTracks = activeQueue.slice(currentIdx + 1, currentIdx + 6); 
-  const isGoldUser = currentUser?.subscriptionTier === "gold";
 
   return (
     <>
       <audio
         onEnded={handleAudioEnded}
-        onTimeUpdate={(event) => setProgress(Math.floor(event.currentTarget.currentTime))}
+        onTimeUpdate={(event) => {
+          const seconds = Math.floor(event.currentTarget.currentTime);
+          setProgress(seconds);
+          reportStream(seconds);
+        }}
         ref={audioRef}
         src={currentTrack.audioUrl}
       />
@@ -268,7 +287,7 @@ export function PlayerShell() {
                 <h3 className="mb-4 text-xs font-bold text-white/50 uppercase tracking-wider">Next In Queue</h3>
                 <div className="flex flex-col gap-2">
                   {upcomingTracks.length > 0 ? upcomingTracks.map(t => {
-                    const tArtist = artists.find(a => a.id === t.artistId);
+                    const tArtist = t.artistName ? { stageName: t.artistName } : null;
                     return (
                       <div className="flex items-center gap-3 cursor-pointer hover:bg-white/10 p-2 rounded-lg transition-colors" key={t.id} onClick={() => setPlayerState?.({ ...playerState, currentTrackId: t.id, isPlaying: true })}>
                         <img alt={t.title} className="h-10 w-10 rounded-md object-cover shadow-sm" src={t.coverImageUrl || ""} />
