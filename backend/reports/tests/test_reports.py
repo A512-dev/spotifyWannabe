@@ -119,7 +119,7 @@ class OperationalReportsApiTests(APITestCase):
         self.assertEqual(response.data["count"], 1)
         self.assertEqual(response.data["results"][0]["id"], str(own_record.pk))
 
-    def test_support_user_can_see_all_revenue_records(self) -> None:
+    def test_support_user_cannot_see_financial_records(self) -> None:
         self.create_record()
         self.create_record(
             artist=self.other_artist_profile,
@@ -128,27 +128,31 @@ class OperationalReportsApiTests(APITestCase):
         )
         self.client.force_authenticate(user=self.support_user)
         response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["count"], 2)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_admin_can_create_revenue_record_and_net_is_computed(self) -> None:
+    def test_admin_cannot_manually_create_revenue_record(self) -> None:
         self.client.force_authenticate(user=self.admin_user)
         response = self.client.post(self.list_url, self.record_payload(), format="json")
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data["netRevenueCents"], 3360)
-        record = ArtistRevenueRecord.objects.get(pk=response.data["id"])
-        self.assertEqual(record.net_revenue_cents, 3360)
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
     def test_non_admin_cannot_create_revenue_record(self) -> None:
         self.client.force_authenticate(user=self.support_user)
         response = self.client.post(self.list_url, self.record_payload(), format="json")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_platform_fee_cannot_exceed_gross_revenue(self) -> None:
+    def test_generated_revenue_rejects_invalid_platform_percentage(self) -> None:
         self.client.force_authenticate(user=self.admin_user)
         response = self.client.post(
-            self.list_url,
-            self.record_payload(platformFeeCents=5000),
+            reverse("reports:artist-revenue-generate"),
+            {
+                "artistId": str(self.artist_profile.pk),
+                "periodStart": "2026-06-01",
+                "periodEnd": "2026-06-30",
+                "currency": "USD",
+                "perStreamCents": 2,
+                "perUniqueListenerCents": 5,
+                "platformFeePercent": 101,
+            },
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -156,7 +160,19 @@ class OperationalReportsApiTests(APITestCase):
     def test_duplicate_artist_period_is_rejected(self) -> None:
         self.create_record()
         self.client.force_authenticate(user=self.admin_user)
-        response = self.client.post(self.list_url, self.record_payload(), format="json")
+        response = self.client.post(
+            reverse("reports:artist-revenue-generate"),
+            {
+                "artistId": str(self.artist_profile.pk),
+                "periodStart": "2026-05-15",
+                "periodEnd": "2026-06-15",
+                "currency": "USD",
+                "perStreamCents": 2,
+                "perUniqueListenerCents": 5,
+                "platformFeePercent": 20,
+            },
+            format="json",
+        )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_admin_can_settle_revenue_record(self) -> None:
@@ -207,7 +223,7 @@ class OperationalReportsApiTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["recordCount"], 1)
-        self.assertEqual(response.data["streams"], 8400)
+        self.assertEqual(response.data["streams"], 0)
         self.assertEqual(response.data["currencyBreakdown"][0]["artistPayoutCents"], 3360)
 
     def test_support_overview_contains_ticket_and_application_counts(self) -> None:
@@ -249,7 +265,7 @@ class OperationalReportsApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["accounting"]["recordCount"], 2)
         self.assertEqual(response.data["accounting"]["artistCount"], 2)
-        self.assertEqual(response.data["accounting"]["streams"], 16800)
+        self.assertEqual(response.data["accounting"]["streams"], 0)
         self.assertEqual(response.data["artists"]["approved"], 2)
         self.assertEqual(
             response.data["accounting"]["currencyBreakdown"][0]["artistPayoutCents"],
@@ -350,3 +366,5 @@ class OperationalReportsApiTests(APITestCase):
         self.assertEqual(response.data["grossRevenueCents"], 16)
         self.assertEqual(response.data["platformFeeCents"], 3)
         self.assertEqual(response.data["netRevenueCents"], 13)
+        self.assertEqual(len(response.data["trackBreakdown"]), 1)
+        self.assertEqual(response.data["trackBreakdown"][0]["netRevenueCents"], 13)

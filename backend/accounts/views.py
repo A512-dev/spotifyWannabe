@@ -20,9 +20,10 @@ from accounts.serializers import (
     PasswordResetRequestSerializer,
     PreferenceSerializer,
     ProfileUpdateSerializer,
+    PublicUserSerializer,
     UserSerializer,
 )
-from accounts.services import logout_user
+from accounts.services import deactivate_user_account, logout_user
 
 User = get_user_model()
 
@@ -102,9 +103,7 @@ class MeView(APIView):
         return Response(UserSerializer(request.user, context={"request": request}).data)
 
     def delete(self, request):
-        user = request.user
-        logout_user(user=user)
-        user.delete()
+        deactivate_user_account(user=request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -142,8 +141,8 @@ class PasswordResetConfirmView(APIView):
 
 
 class UserViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
-    queryset = User.objects.select_related("profile").all()
-    serializer_class = UserSerializer
+    queryset = User.objects.filter(is_active=True).select_related("profile")
+    serializer_class = PublicUserSerializer
     permission_classes = [IsAuthenticated]
 
     @action(detail=True, methods=["post", "delete"], url_path="follow")

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader, StatCard } from "@/components/shared";
 import { Badge, Button, Card, Input, Modal, Select, Table, Tabs, Textarea, type TableColumn } from "@/components/ui";
@@ -26,7 +27,8 @@ function messageFrom(error: unknown) {
   return error instanceof ApiError ? error.message : "The request could not be completed.";
 }
 
-export default function SupportPage() {
+function SupportContent() {
+  const searchParams = useSearchParams();
   const { currentUser } = useAuth();
   const isStaff = currentUser?.role === "support" || currentUser?.role === "admin";
   const [tickets, setTickets] = useState<TicketApi[]>([]);
@@ -70,6 +72,22 @@ export default function SupportPage() {
   useEffect(() => {
     if (currentUser) void loadData();
   }, [currentUser, loadData]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const ticketId = searchParams.get("ticket");
+    const applicationId = searchParams.get("application");
+    if (ticketId) {
+      void operationsApi.getTicket(ticketId)
+        .then(setSelectedTicket)
+        .catch((error) => setNotice(messageFrom(error)));
+    }
+    if (applicationId) {
+      void operationsApi.getApplication(applicationId)
+        .then(setSelectedApplication)
+        .catch((error) => setNotice(messageFrom(error)));
+    }
+  }, [currentUser, searchParams]);
 
   const openTicket = async (ticket: TicketApi) => {
     setBusy(true);
@@ -151,6 +169,8 @@ export default function SupportPage() {
   };
 
   const ticketColumns = useMemo<TableColumn<TicketApi>[]>(() => [
+    { key: "id", header: "Ticket ID", render: (row) => <span className="font-mono text-xs">{row.id.slice(0, 8)}</span> },
+    { key: "requester", header: "User", render: (row) => row.requesterName ?? row.requesterId },
     {
       key: "subject",
       header: "Subject",
@@ -160,10 +180,9 @@ export default function SupportPage() {
         </button>
       )
     },
-    { key: "requester", header: "Requester", render: (row) => row.requesterName ?? row.requesterId },
+    { key: "created", header: "Submitted", render: (row) => formatDate(row.createdAt) },
     { key: "status", header: "Status", render: (row) => <Badge tone={statusTone[row.status]}>{row.status.replaceAll("_", " ")}</Badge> },
-    { key: "priority", header: "Priority", render: (row) => <Badge>{row.priority}</Badge> },
-    { key: "updated", header: "Updated", render: (row) => formatDate(row.updatedAt) }
+    { key: "priority", header: "Priority", render: (row) => <Badge>{row.priority}</Badge> }
   ], []);
 
   const applicationColumns = useMemo<TableColumn<ArtistApplicationApi>[]>(() => [
@@ -244,6 +263,7 @@ export default function SupportPage() {
 
       <section className="mt-6">
         <Tabs
+          defaultTabId={searchParams.get("application") ? "applications" : searchParams.get("ticket") ? "tickets" : undefined}
           tabs={isStaff
             ? [
                 { id: "tickets", label: "Support tickets", content: ticketsPanel },
@@ -267,7 +287,7 @@ export default function SupportPage() {
               {(selectedTicket.messages ?? []).map((message) => (
                 <article className="rounded-md bg-surface-700 p-3" key={message.id}>
                   <div className="flex items-center justify-between gap-3 text-xs text-slate-400">
-                    <span>{message.isInternalNote ? "Internal note" : message.senderId}</span>
+                    <span>{message.isInternalNote ? `Internal note · ${message.senderName}` : message.senderName}</span>
                     <span>{formatDate(message.createdAt)}</span>
                   </div>
                   <p className="mt-2 whitespace-pre-wrap text-sm text-slate-100">{message.body}</p>
@@ -313,4 +333,8 @@ export default function SupportPage() {
       </Modal>
     </DashboardLayout>
   );
+}
+
+export default function SupportPage() {
+  return <Suspense fallback={<DashboardLayout eyebrow="Support workspace">Loading support...</DashboardLayout>}><SupportContent /></Suspense>;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import type { ReactNode } from "react";
+import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { musicApi } from "@/features/music/api";
 import { useAuth } from "@/providers/AuthProvider";
 import type { PlayerState, Track } from "@/types/domain";
@@ -16,7 +16,7 @@ const DEFAULT_PLAYER_STATE: PlayerState = {
 
 interface PlayerContextValue {
   playerState: PlayerState;
-  setPlayerState: (state: PlayerState) => void;
+  setPlayerState: Dispatch<SetStateAction<PlayerState>>;
   tracks: Track[];
   refreshTracks: () => Promise<void>;
 }

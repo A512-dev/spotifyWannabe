@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from rest_framework import filters, mixins, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -12,6 +13,7 @@ from artists.serializers import (
     ArtistApplicationReviewSerializer,
     ArtistApplicationSerializer,
     ArtistProfileSerializer,
+    ArtistProfileUpdateSerializer,
 )
 from artists.services import review_artist_application
 from common.permissions import IsSupportOrAdministrator
@@ -79,6 +81,7 @@ class ArtistApplicationViewSet(
 class ArtistProfileViewSet(
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
     viewsets.GenericViewSet,
 ):
     serializer_class = ArtistProfileSerializer
@@ -87,6 +90,19 @@ class ArtistProfileViewSet(
     search_fields = ["stage_name", "bio", "genre_tags"]
     ordering_fields = ["stage_name", "verified_at", "created_at"]
     ordering = ["stage_name"]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    http_method_names = ["get", "patch", "head", "options"]
+
+    def get_serializer_class(self):
+        if self.action == "partial_update":
+            return ArtistProfileUpdateSerializer
+        return ArtistProfileSerializer
+
+    def perform_update(self, serializer):
+        profile = self.get_object()
+        if not self.request.user.is_superuser and profile.user_id != self.request.user.pk:
+            raise PermissionDenied("Artists may only edit their own public profile.")
+        serializer.save()
 
     def get_queryset(self):
         return (

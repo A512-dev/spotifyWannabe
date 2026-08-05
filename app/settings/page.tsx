@@ -10,21 +10,13 @@ import { planApi, type SubscriptionPlanApi } from "@/features/account/plans";
 import { subscriptionApi } from "@/features/account/subscriptions";
 import { formatCurrencyFromCents } from "@/lib/formatters";
 import { getSubscriptionLabel } from "@/lib/labels";
-import { useAuth } from "@/providers";
-
-const defaultPreferences: PreferenceResponse = {
-  language: "en",
-  systemSoundEnabled: true,
-  notificationsEnabled: true,
-  subscriptionNotifications: true,
-  followedArtistNotifications: true,
-  supportNotifications: true
-};
+import { DEFAULT_USER_PREFERENCES, useAuth, useUserPreferences } from "@/providers";
 
 export default function SettingsPage() {
   const router = useRouter();
   const { currentUser, deleteCurrentUser } = useAuth();
-  const [preferences, setPreferences] = useState(defaultPreferences);
+  const { preferences: appliedPreferences, setPreferences: applyPreferences, t } = useUserPreferences();
+  const [preferences, setPreferences] = useState<PreferenceResponse>(DEFAULT_USER_PREFERENCES);
   const [plans, setPlans] = useState<SubscriptionPlanApi[]>([]);
   const [selectedTier, setSelectedTier] = useState<"silver" | "gold">("silver");
   const [months, setMonths] = useState<1 | 3 | 6 | 12>(1);
@@ -43,6 +35,10 @@ export default function SettingsPage() {
       .catch((requestError: Error) => setError(requestError.message));
   }, [currentUser]);
 
+  useEffect(() => {
+    setPreferences(appliedPreferences);
+  }, [appliedPreferences]);
+
   const selectedPlan = useMemo(() => plans.find((plan) => plan.tier === selectedTier), [plans, selectedTier]);
 
   if (!currentUser) return <MainAppLayout>Loading settings...</MainAppLayout>;
@@ -54,6 +50,7 @@ export default function SettingsPage() {
     try {
       const next = await accountApi.updatePreferences(preferences);
       setPreferences(next);
+      applyPreferences(next);
       setSuccessMessage("Settings saved.");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Could not save settings.");
@@ -85,48 +82,48 @@ export default function SettingsPage() {
 
   return (
     <MainAppLayout>
-      <PageHeader description="Manage synchronized preferences, subscription status, and account removal." title="Settings" />
+      <PageHeader description="Manage synchronized preferences, subscription status, and account removal." title={t("Settings")} />
       <section className="mt-6 grid gap-4 lg:grid-cols-2">
         <Card>
-          <h2 className="text-lg font-semibold text-slate-50">Preferences</h2>
+          <h2 className="text-lg font-semibold text-slate-50">{t("Preferences")}</h2>
           <div className="mt-4 space-y-4">
             <Select
-              label="Language"
+              label={t("Language")}
               name="language"
               onChange={(event) => setPreferences((value) => ({ ...value, language: event.target.value as "en" | "fa" }))}
-              options={[{ label: "English", value: "en" }, { label: "Persian", value: "fa" }]}
+              options={[{ label: t("English"), value: "en" }, { label: t("Persian"), value: "fa" }]}
               value={preferences.language}
             />
-            <Checkbox checked={preferences.systemSoundEnabled} label="System sounds" name="systemSoundEnabled" onChange={(e) => setPreferences((v) => ({ ...v, systemSoundEnabled: e.target.checked }))} />
-            <Checkbox checked={preferences.notificationsEnabled} label="Enable notifications" name="notificationsEnabled" onChange={(e) => setPreferences((v) => ({ ...v, notificationsEnabled: e.target.checked }))} />
-            <Checkbox checked={preferences.subscriptionNotifications} label="Subscription expiry notifications" name="subscriptionNotifications" onChange={(e) => setPreferences((v) => ({ ...v, subscriptionNotifications: e.target.checked }))} />
-            <Checkbox checked={preferences.followedArtistNotifications} label="Followed artist releases" name="followedArtistNotifications" onChange={(e) => setPreferences((v) => ({ ...v, followedArtistNotifications: e.target.checked }))} />
-            <Checkbox checked={preferences.supportNotifications} label="Support ticket notifications" name="supportNotifications" onChange={(e) => setPreferences((v) => ({ ...v, supportNotifications: e.target.checked }))} />
-            <Button disabled={saving} onClick={handleSave}>{saving ? "Saving..." : "Save preferences"}</Button>
+            <Checkbox checked={preferences.systemSoundEnabled} label={t("System sounds")} name="systemSoundEnabled" onChange={(e) => setPreferences((v) => ({ ...v, systemSoundEnabled: e.target.checked }))} />
+            <Checkbox checked={preferences.notificationsEnabled} label={t("Enable notifications")} name="notificationsEnabled" onChange={(e) => setPreferences((v) => ({ ...v, notificationsEnabled: e.target.checked }))} />
+            <Checkbox checked={preferences.subscriptionNotifications} label={t("Subscription expiry notifications")} name="subscriptionNotifications" onChange={(e) => setPreferences((v) => ({ ...v, subscriptionNotifications: e.target.checked }))} />
+            <Checkbox checked={preferences.followedArtistNotifications} label={t("Followed artist releases")} name="followedArtistNotifications" onChange={(e) => setPreferences((v) => ({ ...v, followedArtistNotifications: e.target.checked }))} />
+            <Checkbox checked={preferences.supportNotifications} label={t("Support ticket notifications")} name="supportNotifications" onChange={(e) => setPreferences((v) => ({ ...v, supportNotifications: e.target.checked }))} />
+            <Button disabled={saving} onClick={handleSave}>{saving ? t("Saving...") : t("Save preferences")}</Button>
           </div>
         </Card>
 
         <Card>
-          <h2 className="text-lg font-semibold text-slate-50">Subscription</h2>
+          <h2 className="text-lg font-semibold text-slate-50">{t("Subscription")}</h2>
           <p className="mt-2 text-sm text-slate-400">Current plan: {getSubscriptionLabel(currentUser.subscriptionTier)}</p>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <Select label="Plan" name="plan" onChange={(e) => setSelectedTier(e.target.value as "silver" | "gold")} options={[{ label: "Silver", value: "silver" }, { label: "Gold", value: "gold" }]} value={selectedTier} />
-            <Select label="Billing period" name="months" onChange={(e) => setMonths(Number(e.target.value) as 1 | 3 | 6 | 12)} options={[1, 3, 6, 12].map((value) => ({ label: `${value} month${value > 1 ? "s" : ""}`, value: String(value) }))} value={String(months)} />
+            <Select label={t("Plan")} name="plan" onChange={(e) => setSelectedTier(e.target.value as "silver" | "gold")} options={[{ label: "Silver", value: "silver" }, { label: "Gold", value: "gold" }]} value={selectedTier} />
+            <Select label={t("Billing period")} name="months" onChange={(e) => setMonths(Number(e.target.value) as 1 | 3 | 6 | 12)} options={[1, 3, 6, 12].map((value) => ({ label: `${value} month${value > 1 ? "s" : ""}`, value: String(value) }))} value={String(months)} />
           </div>
           {selectedPlan ? (
             <p className="mt-4 text-sm text-slate-300">
               Total: {formatCurrencyFromCents(selectedPlan.periodPrices[String(months)] ?? selectedPlan.monthlyPriceCents * months, selectedPlan.currency)}
             </p>
           ) : null}
-          <Button className="mt-4" onClick={handleUpgrade}>Continue to payment</Button>
+          <Button className="mt-4" onClick={handleUpgrade}>{t("Continue to payment")}</Button>
         </Card>
       </section>
 
       <section className="mt-6">
         <Card>
-          <h2 className="text-lg font-semibold text-red-300">Danger zone</h2>
-          <p className="mt-2 text-sm text-slate-400">Deleting the account removes profile, playlists, history, notifications, and owned support data according to backend relationships.</p>
-          <Button className="mt-4" onClick={() => setDeleteDialogOpen(true)} variant="danger">Delete account</Button>
+          <h2 className="text-lg font-semibold text-red-300">{t("Danger zone")}</h2>
+          <p className="mt-2 text-sm text-slate-400">Account deletion removes personal profile data and access immediately. Required accounting and support audit rows remain under an anonymous inactive user.</p>
+          <Button className="mt-4" onClick={() => setDeleteDialogOpen(true)} variant="danger">{t("Delete account")}</Button>
         </Card>
       </section>
 

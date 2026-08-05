@@ -9,12 +9,13 @@ import { Topbar } from "@/components/layout/Topbar";
 import { Button } from "@/components/ui";
 import { canAccessRoute } from "@/lib/permissions";
 import { getPostLoginPath } from "@/lib/auth";
-import { useAuth } from "@/providers/AuthProvider";
+import { useAuth, useUserPreferences } from "@/providers";
 
 export function MainAppLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { currentUser, isAuthReady } = useAuth();
+  const { t } = useUserPreferences();
 
   useEffect(() => {
     if (isAuthReady && !currentUser) {
@@ -26,7 +27,7 @@ export function MainAppLayout({ children }: { children: ReactNode }) {
   if (!isAuthReady) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-surface-light px-4 text-brand-primary">
-        Loading account...
+        {t("Loading account...")}
       </main>
     );
   }
@@ -35,7 +36,7 @@ export function MainAppLayout({ children }: { children: ReactNode }) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-surface-light px-4">
         <section className="w-full max-w-md rounded-lg border border-brand-secondary/30 bg-white p-6 text-center shadow-md">
-          <h1 className="text-xl font-semibold text-brand-primary">Sign in required</h1>
+          <h1 className="text-xl font-semibold text-brand-primary">{t("Sign in required")}</h1>
           <p className="mt-2 text-sm text-brand-primary/80">Please log in before opening this part of SoundWave.</p>
           <Button className="mt-5 bg-brand-primary hover:bg-brand-secondary text-white" onClick={() => router.push("/login")} type="button">
             Go to login
@@ -49,7 +50,7 @@ export function MainAppLayout({ children }: { children: ReactNode }) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-surface-light px-4">
         <section className="w-full max-w-md rounded-lg border border-brand-secondary/30 bg-white p-6 text-center shadow-md">
-          <h1 className="text-xl font-semibold text-brand-primary">Access denied</h1>
+          <h1 className="text-xl font-semibold text-brand-primary">{t("Access denied")}</h1>
           <p className="mt-2 text-sm text-brand-primary/80">Your current role does not have access to this page.</p>
           <Button className="mt-5 bg-brand-primary hover:bg-brand-secondary text-white" onClick={() => router.push(getPostLoginPath(currentUser))} type="button">
             Go to your home

@@ -47,7 +47,7 @@ def review_artist_application(
     )
 
     if decision == ArtistApplicationStatus.APPROVED:
-        ArtistProfile.objects.update_or_create(
+        artist_profile, _ = ArtistProfile.objects.update_or_create(
             user=locked_application.applicant,
             defaults={
                 "stage_name": locked_application.stage_name,
@@ -56,6 +56,9 @@ def review_artist_application(
                 "verified_by": reviewer,
             },
         )
+        if not artist_profile.bio and locked_application.portfolio_description:
+            artist_profile.bio = locked_application.portfolio_description.strip()
+            artist_profile.save(update_fields=["bio", "updated_at"])
         artist_group, _ = Group.objects.get_or_create(name="artist")
         locked_application.applicant.groups.add(artist_group)
 

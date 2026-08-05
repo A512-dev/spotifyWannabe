@@ -26,7 +26,7 @@ export function PlayerTrackSummary({ track }: PlayerTrackSummaryProps) {
           </Link>
           {track.albumId ? <><span className="text-white/40">•</span><Link className="truncate hover:text-white hover:underline" href={`/music/album/${track.albumId}`} onClick={(event) => event.stopPropagation()}>{track.albumTitle ?? "Album"}</Link></> : null}
         </div>
-        {currentUser?.subscriptionTier === "gold" ? <span className="mt-0.5 text-[10px] font-bold text-yellow-400">{formatNumber(track.playCount ?? 0)} streams</span> : null}
+        {currentUser?.subscriptionTier === "gold" ? <span className="mt-0.5 text-[10px] font-bold text-yellow-400">{formatNumber(track.playCount ?? 0)} streams · {formatNumber(track.uniqueListeners ?? 0)} listeners</span> : null}
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { MainAppLayout } from "@/components/layout/MainAppLayout";
 import { AlbumCard, PageHeader, TrackCard } from "@/components/shared";
 import { musicApi } from "@/features/music/api";
+import { usePlayer } from "@/providers";
 import type { Album, Track } from "@/types/domain";
 
 type ApiTrack = Track & { artistName?: string };
@@ -15,6 +16,8 @@ function MusicContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const targetPlaylistId = searchParams.get("addToPlaylist");
+  const targetTrackId = searchParams.get("track");
+  const { setPlayerState } = usePlayer();
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("newest");
   const [tracks, setTracks] = useState<ApiTrack[]>([]);
@@ -38,6 +41,17 @@ function MusicContent() {
     }, 250);
     return () => window.clearTimeout(timer);
   }, [searchQuery, sortBy]);
+
+  useEffect(() => {
+    if (!targetTrackId || tracks.length === 0) return;
+    const target = tracks.find((track) => track.id === targetTrackId);
+    if (!target) return;
+    const queueTrackIds = tracks.map((track) => track.id);
+    localStorage.setItem("soundwave_active_queue", JSON.stringify(queueTrackIds));
+    setPlayerState((state) => ({ ...state, currentTrackId: target.id, queueTrackIds, isPlaying: true }));
+    // The notification target is consumed once after the catalog is loaded.
+    router.replace("/music", { scroll: false });
+  }, [router, setPlayerState, targetTrackId, tracks]);
 
   const handleSelect = async (track: Track) => {
     if (!targetPlaylistId) return;

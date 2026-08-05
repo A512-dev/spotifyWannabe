@@ -76,7 +76,7 @@ python manage.py test -v 2
 Validated result on the delivery version:
 
 ```text
-Found 116 test(s).
+Found 120 test(s).
 ...
 OK
 ```

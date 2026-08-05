@@ -6,11 +6,12 @@ import { ACCOUNT_NAVIGATION } from "@/config/navigation";
 import { Avatar } from "@/components/ui/Avatar";
 import { filterNavigationForUser } from "@/lib/permissions";
 import { getRoleLabel, getSubscriptionLabel } from "@/lib/labels";
-import { useAuth } from "@/providers/AuthProvider";
+import { useAuth, useUserPreferences } from "@/providers";
 
 export function Topbar() {
   const router = useRouter();
   const { currentUser, logout } = useAuth();
+  const { t } = useUserPreferences();
   if (!currentUser) {
     return null;
   }
@@ -34,7 +35,7 @@ export function Topbar() {
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
           </div>
           <div className="min-w-0">
-            <p className="truncate text-[10px] tracking-wider uppercase text-white/40 font-bold">Session Active</p>
+            <p className="truncate text-[10px] tracking-wider uppercase text-white/40 font-bold">{t("Session Active")}</p>
             <p className="truncate text-sm font-black text-white/95 tracking-wide drop-shadow-sm">
               {currentUser.displayName}
             </p>
@@ -66,7 +67,7 @@ export function Topbar() {
                 href={item.href} 
                 key={item.href}
               >
-                {item.label}
+                {t(item.label)}
               </Link>
             ))}
           </nav>
@@ -84,7 +85,7 @@ export function Topbar() {
               onClick={handleLogout} 
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-rose-400 border border-rose-500/0 hover:border-rose-500/20 hover:bg-rose-500/10 transition-all duration-200 group"
             >
-              <span>Log out</span>
+              <span>{t("Log out")}</span>
               <svg 
                 className="h-3.5 w-3.5 transform transition-transform group-hover:translate-x-0.5" 
                 fill="none" 

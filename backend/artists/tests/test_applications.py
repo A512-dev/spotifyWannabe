@@ -192,6 +192,7 @@ class ArtistApplicationApiTests(APITestCase):
         self.assertEqual(application.status, "approved")
         self.assertTrue(profile.is_approved)
         self.assertEqual(profile.stage_name, application.stage_name)
+        self.assertEqual(profile.bio, application.portfolio_description)
         self.assertTrue(self.applicant.groups.filter(name="artist").exists())
         self.assertTrue(callback.called)
 
@@ -211,3 +212,29 @@ class ArtistApplicationApiTests(APITestCase):
         )
         self.assertEqual(first_response.status_code, status.HTTP_200_OK)
         self.assertEqual(second_response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_artist_can_edit_own_public_profile_but_not_another_profile(self) -> None:
+        own_profile = ArtistProfile.objects.create(
+            user=self.applicant,
+            stage_name="Editable Artist",
+            is_approved=True,
+        )
+        other_profile = ArtistProfile.objects.create(
+            user=self.other_applicant,
+            stage_name="Other Artist",
+            is_approved=True,
+        )
+        self.client.force_authenticate(user=self.applicant)
+        own_response = self.client.patch(
+            reverse("artists:profile-detail", args=[own_profile.pk]),
+            {"bio": "Updated biography", "genreTags": ["Electronic", "Ambient"]},
+            format="json",
+        )
+        self.assertEqual(own_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(own_response.data["genreTags"], ["Electronic", "Ambient"])
+        foreign_response = self.client.patch(
+            reverse("artists:profile-detail", args=[other_profile.pk]),
+            {"bio": "Unauthorized"},
+            format="json",
+        )
+        self.assertEqual(foreign_response.status_code, status.HTTP_403_FORBIDDEN)

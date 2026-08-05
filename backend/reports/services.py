@@ -49,8 +49,10 @@ def create_artist_revenue_record(
     platform_fee_cents: int,
     currency: str,
     calculation_note: str = "",
+    track_breakdown: list[dict] | None = None,
 ) -> ArtistRevenueRecord:
-    if not artist.is_approved:
+    locked_artist = ArtistProfile.objects.select_for_update().get(pk=artist.pk)
+    if not locked_artist.is_approved:
         raise ValidationError({"artistId": "Revenue can only be recorded for approved artists."})
     if period_end < period_start:
         raise ValidationError({"periodEnd": "The reporting period end cannot be before its start."})
@@ -58,16 +60,16 @@ def create_artist_revenue_record(
         raise ValidationError({"platformFeeCents": "The platform fee cannot exceed gross revenue."})
 
     if ArtistRevenueRecord.objects.filter(
-        artist=artist,
-        period_start=period_start,
-        period_end=period_end,
+        artist=locked_artist,
+        period_start__lte=period_end,
+        period_end__gte=period_start,
     ).exists():
         raise ValidationError(
-            {"period": "A revenue record already exists for this artist and period."}
+            {"period": "This period overlaps an existing revenue record for the artist."}
         )
 
     record = ArtistRevenueRecord.objects.create(
-        artist=artist,
+        artist=locked_artist,
         period_start=period_start,
         period_end=period_end,
         unique_listener_count=unique_listener_count,
@@ -76,14 +78,15 @@ def create_artist_revenue_record(
         platform_fee_cents=platform_fee_cents,
         currency=currency,
         calculation_note=calculation_note.strip(),
+        track_breakdown=track_breakdown or [],
     )
 
     transaction.on_commit(
         lambda: artist_revenue_record_created.send(
             sender=ArtistRevenueRecord,
             record_id=record.pk,
-            artist_id=artist.pk,
-            artist_user_id=artist.user_id,
+            artist_id=locked_artist.pk,
+            artist_user_id=locked_artist.user_id,
         )
     )
     return record
@@ -100,7 +103,7 @@ def settle_artist_revenue_record(
 
     locked_record = (
         ArtistRevenueRecord.objects.select_for_update()
-        .select_related("artist", "artist__user", "settled_by")
+        .select_related("artist", "artist__user")
         .get(pk=record.pk)
     )
     if locked_record.payment_status == PaymentStatus.SETTLED:
@@ -164,17 +167,35 @@ def build_artist_overview(
         period_end=period_end,
     )
     totals = queryset.aggregate(
-        streams=Sum("stream_count"),
         pending_payments=Count("id", filter=models_q(payment_status=PaymentStatus.PENDING)),
         settled_payments=Count("id", filter=models_q(payment_status=PaymentStatus.SETTLED)),
     )
     from music.models import StreamEvent
 
-    unique_listeners = StreamEvent.objects.filter(
+    live_events = StreamEvent.objects.filter(
         track__artist=artist,
         counted=True,
         streamed_on__range=(period_start, period_end),
-    ).values("listener_id").distinct().count()
+    )
+    unique_listeners = live_events.values("listener_id").distinct().count()
+    track_revenue: dict[tuple[str, str], dict] = {}
+    for record in queryset:
+        for row in record.track_breakdown:
+            key = (str(row.get("trackId")), record.currency)
+            aggregate = track_revenue.setdefault(
+                key,
+                {
+                    "trackId": str(row.get("trackId")),
+                    "trackTitle": row.get("trackTitle", "Track"),
+                    "currency": record.currency,
+                    "streamCount": 0,
+                    "uniqueListeners": 0,
+                    "netRevenueCents": 0,
+                },
+            )
+            aggregate["streamCount"] += int(row.get("streamCount", 0))
+            aggregate["uniqueListeners"] += int(row.get("uniqueListeners", 0))
+            aggregate["netRevenueCents"] += int(row.get("netRevenueCents", 0))
     return {
         "periodStart": period_start,
         "periodEnd": period_end,
@@ -182,10 +203,11 @@ def build_artist_overview(
         "artistName": artist.stage_name,
         "recordCount": queryset.count(),
         "uniqueListeners": unique_listeners,
-        "streams": totals["streams"] or 0,
+        "streams": live_events.count(),
         "pendingPayments": totals["pending_payments"] or 0,
         "settledPayments": totals["settled_payments"] or 0,
         "currencyBreakdown": build_currency_breakdown(queryset),
+        "trackRevenueBreakdown": list(track_revenue.values()),
         "generatedAt": timezone.now(),
     }
 
@@ -227,6 +249,32 @@ def generate_artist_revenue_record_from_streams(
         + unique_listener_count * per_unique_listener_cents
     )
     platform_fee_cents = gross_revenue_cents * platform_fee_percent // 100
+    track_breakdown = []
+    for row in events.values("track_id", "track__title").annotate(
+        stream_count=Count("id"),
+        unique_listener_count=Count("listener_id", distinct=True),
+    ).order_by("track_id"):
+        track_gross = (
+            row["stream_count"] * per_stream_cents
+            + row["unique_listener_count"] * per_unique_listener_cents
+        )
+        track_fee = track_gross * platform_fee_percent // 100
+        track_breakdown.append(
+            {
+                "trackId": str(row["track_id"]),
+                "trackTitle": row["track__title"],
+                "streamCount": row["stream_count"],
+                "uniqueListeners": row["unique_listener_count"],
+                "grossRevenueCents": track_gross,
+                "platformFeeCents": track_fee,
+                "netRevenueCents": track_gross - track_fee,
+            }
+        )
+    allocated_fee = sum(row["platformFeeCents"] for row in track_breakdown)
+    if track_breakdown and allocated_fee != platform_fee_cents:
+        adjustment = platform_fee_cents - allocated_fee
+        track_breakdown[0]["platformFeeCents"] += adjustment
+        track_breakdown[0]["netRevenueCents"] -= adjustment
     return create_artist_revenue_record(
         artist=artist,
         period_start=period_start,
@@ -241,6 +289,7 @@ def generate_artist_revenue_record_from_streams(
             f"{per_unique_listener_cents} cents/unique listener, "
             f"{platform_fee_percent}% platform fee."
         ),
+        track_breakdown=track_breakdown,
     )
 
 def models_q(**kwargs):
@@ -345,16 +394,16 @@ def build_admin_overview(*, period_start: date, period_end: date) -> dict:
         period_end=period_end,
     )
     totals = queryset.aggregate(
-        streams=Sum("stream_count"),
         pending_payments=Count("id", filter=models_q(payment_status=PaymentStatus.PENDING)),
         settled_payments=Count("id", filter=models_q(payment_status=PaymentStatus.SETTLED)),
     )
     from music.models import StreamEvent
 
-    unique_listeners = StreamEvent.objects.filter(
+    live_events = StreamEvent.objects.filter(
         counted=True,
         streamed_on__range=(period_start, period_end),
-    ).values("listener_id").distinct().count()
+    )
+    unique_listeners = live_events.values("listener_id").distinct().count()
     return {
         "periodStart": period_start,
         "periodEnd": period_end,
@@ -362,7 +411,7 @@ def build_admin_overview(*, period_start: date, period_end: date) -> dict:
             "recordCount": queryset.count(),
             "artistCount": queryset.values("artist_id").distinct().count(),
             "uniqueListeners": unique_listeners,
-            "streams": totals["streams"] or 0,
+            "streams": live_events.count(),
             "pendingPayments": totals["pending_payments"] or 0,
             "settledPayments": totals["settled_payments"] or 0,
             "currencyBreakdown": build_currency_breakdown(queryset),

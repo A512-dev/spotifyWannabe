@@ -4,6 +4,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from notifications.models import Notification, NotificationType
+from notifications.services import create_notification
 
 User = get_user_model()
 
@@ -40,3 +41,21 @@ class NotificationApiTests(APITestCase):
     def test_user_cannot_access_foreign_notification(self):
         response = self.client.get(reverse("notifications:notification-detail", args=[self.foreign.pk]))
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_followed_release_setting_does_not_hide_artist_account_decisions(self):
+        self.user.preferences.followed_artist_notifications = False
+        self.user.preferences.save()
+        release = create_notification(
+            recipient_id=self.user.pk,
+            type=NotificationType.ARTIST_RELEASE,
+            title="Release",
+            message="New track",
+        )
+        decision = create_notification(
+            recipient_id=self.user.pk,
+            type=NotificationType.ARTIST,
+            title="Application approved",
+            message="Approved",
+        )
+        self.assertIsNone(release)
+        self.assertIsNotNone(decision)

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { MainAppLayout } from "@/components/layout/MainAppLayout";
 import { EmptyState, PageHeader, PlaylistCard, TrackCard } from "@/components/shared";
-import { Button, Input, Modal } from "@/components/ui";
+import { Button, Checkbox, Input, Modal, Textarea } from "@/components/ui";
 import { musicApi, type PlaylistWithItems } from "@/features/music/api";
 import { getPlaylistLimit } from "@/lib/subscription";
 import { useAuth, usePlayer } from "@/providers";
@@ -17,6 +17,9 @@ export default function PlaylistsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editing, setEditing] = useState<PlaylistWithItems | null>(null);
   const [titleInput, setTitleInput] = useState("");
+  const [descriptionInput, setDescriptionInput] = useState("");
+  const [isPublicInput, setIsPublicInput] = useState(false);
+  const [coverInput, setCoverInput] = useState<File | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -41,12 +44,18 @@ export default function PlaylistsPage() {
   const openCreate = () => {
     setEditing(null);
     setTitleInput("");
+    setDescriptionInput("");
+    setIsPublicInput(false);
+    setCoverInput(null);
     setIsModalOpen(true);
   };
 
   const openEdit = (playlist: PlaylistWithItems) => {
     setEditing(playlist);
     setTitleInput(playlist.title);
+    setDescriptionInput(playlist.description ?? "");
+    setIsPublicInput(playlist.isPublic);
+    setCoverInput(null);
     setIsModalOpen(true);
   };
 
@@ -55,8 +64,12 @@ export default function PlaylistsPage() {
     const title = titleInput.trim();
     if (!title) return;
     try {
-      if (editing) await musicApi.renamePlaylist(editing.id, title);
-      else await musicApi.createPlaylist(title);
+      const data = new FormData();
+      data.set("title", title);
+      data.set("description", descriptionInput.trim());
+      data.set("isPublic", String(isPublicInput));
+      if (coverInput) data.set("coverImage", coverInput);
+      await musicApi.savePlaylist(data, editing?.id);
       setIsModalOpen(false);
       await load();
     } catch (requestError) {
@@ -118,7 +131,7 @@ export default function PlaylistsPage() {
                   <Button disabled={!tracks.length} onClick={() => void playPlaylist(playlist)} size="sm">Play</Button>
                   <Link className="rounded-md bg-white/10 px-3 py-1.5 text-xs font-bold" href={`/music?addToPlaylist=${playlist.id}`}>Add track</Link>
                   <div className="flex gap-2">
-                    <Button onClick={() => openEdit(playlist)} size="sm" variant="secondary">Rename</Button>
+                    <Button onClick={() => openEdit(playlist)} size="sm" variant="secondary">Edit</Button>
                     <Button onClick={() => void removePlaylist(playlist.id)} size="sm" variant="danger">Delete</Button>
                   </div>
                 </div>
@@ -135,9 +148,12 @@ export default function PlaylistsPage() {
           })}
         </section>
       )}
-      <Modal onClose={() => setIsModalOpen(false)} open={isModalOpen} title={editing ? "Rename playlist" : "Create playlist"}>
+      <Modal onClose={() => setIsModalOpen(false)} open={isModalOpen} title={editing ? "Edit playlist" : "Create playlist"}>
         <form className="space-y-4" onSubmit={submit}>
           <Input autoFocus label="Playlist title" name="playlistTitle" onChange={(e) => setTitleInput(e.target.value)} required value={titleInput} />
+          <Textarea label="Description" onChange={(event) => setDescriptionInput(event.target.value)} rows={3} value={descriptionInput} />
+          <Input accept="image/*" label="Cover image" onChange={(event) => setCoverInput(event.target.files?.[0] ?? null)} type="file" />
+          <Checkbox checked={isPublicInput} label="Public playlist" onChange={(event) => setIsPublicInput(event.target.checked)} />
           <div className="flex justify-end gap-2"><Button onClick={() => setIsModalOpen(false)} type="button" variant="ghost">Cancel</Button><Button type="submit">Save</Button></div>
         </form>
       </Modal>

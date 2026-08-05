@@ -24,6 +24,7 @@ class ArtistRevenueRecordSerializer(serializers.ModelSerializer):
     calculationNote = serializers.CharField(source="calculation_note", read_only=True)
     createdAt = serializers.DateTimeField(source="created_at", read_only=True)
     updatedAt = serializers.DateTimeField(source="updated_at", read_only=True)
+    trackBreakdown = serializers.JSONField(source="track_breakdown", read_only=True)
 
     class Meta:
         model = ArtistRevenueRecord
@@ -46,6 +47,7 @@ class ArtistRevenueRecordSerializer(serializers.ModelSerializer):
             "calculationNote",
             "createdAt",
             "updatedAt",
+            "trackBreakdown",
         ]
 
     def get_artistId(self, obj: ArtistRevenueRecord) -> str:

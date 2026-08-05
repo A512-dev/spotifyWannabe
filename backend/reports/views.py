@@ -10,11 +10,10 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from common.permissions import IsAdministrator, IsApprovedArtist, IsSupportOrAdministrator, user_in_group
+from common.permissions import IsAdministrator, IsApprovedArtist, IsSupportOrAdministrator
 from reports.models import ArtistRevenueRecord, PaymentStatus, RevenueCurrency
 from reports.permissions import CanViewOperationalReports
 from reports.serializers import (
-    ArtistRevenueRecordCreateSerializer,
     ArtistRevenueGenerateSerializer,
     ArtistRevenueRecordSerializer,
 )
@@ -44,7 +43,6 @@ def parse_period(request) -> tuple[date, date]:
 
 
 class ArtistRevenueRecordViewSet(
-    mixins.CreateModelMixin,
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
     viewsets.GenericViewSet,
@@ -62,13 +60,11 @@ class ArtistRevenueRecordViewSet(
     ordering = ["-period_start", "artist__stage_name"]
 
     def get_permissions(self):
-        if self.action in {"create", "generate", "settle"}:
+        if self.action in {"generate", "settle"}:
             return [IsAdministrator()]
         return [CanViewOperationalReports()]
 
     def get_serializer_class(self):
-        if self.action == "create":
-            return ArtistRevenueRecordCreateSerializer
         if self.action == "generate":
             return ArtistRevenueGenerateSerializer
         return ArtistRevenueRecordSerializer
@@ -80,7 +76,7 @@ class ArtistRevenueRecordViewSet(
             "settled_by",
         )
         user = self.request.user
-        if not (user.is_superuser or user_in_group(user, "support")):
+        if not user.is_superuser:
             artist_profile = getattr(user, "artist_profile", None)
             if artist_profile is None or not artist_profile.is_approved:
                 return queryset.none()
@@ -95,7 +91,7 @@ class ArtistRevenueRecordViewSet(
             queryset = queryset.filter(currency=currency)
 
         artist_id = self.request.query_params.get("artistId")
-        if artist_id and (user.is_superuser or user_in_group(user, "support")):
+        if artist_id and user.is_superuser:
             queryset = queryset.filter(artist_id=artist_id)
 
         raw_start = self.request.query_params.get("periodStart")

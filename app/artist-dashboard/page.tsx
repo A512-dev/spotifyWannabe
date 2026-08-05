@@ -60,7 +60,7 @@ function initialDraft(): ReleaseDraft {
     singleFile: null,
     singleDuration: 0,
     lyrics: "",
-    albumTracks: [initialAlbumTrack()]
+    albumTracks: [initialAlbumTrack(), initialAlbumTrack()]
   };
 }
 
@@ -113,6 +113,18 @@ export default function ArtistDashboardPage() {
   const [editTitle, setEditTitle] = useState("");
   const [editLyrics, setEditLyrics] = useState("");
   const [editStatus, setEditStatus] = useState<ReleaseStatus>("draft");
+  const [editReleaseDate, setEditReleaseDate] = useState("");
+  const [editGenreId, setEditGenreId] = useState("");
+  const [editEarlyAccess, setEditEarlyAccess] = useState(false);
+  const [editExplicit, setEditExplicit] = useState(false);
+  const [editCollaborators, setEditCollaborators] = useState("");
+  const [editCover, setEditCover] = useState<File | null>(null);
+  const [editAudio, setEditAudio] = useState<File | null>(null);
+  const [editDuration, setEditDuration] = useState(0);
+  const [profileBio, setProfileBio] = useState("");
+  const [profileGenres, setProfileGenres] = useState("");
+  const [profileImage, setProfileImage] = useState<File | null>(null);
+  const [profileBanner, setProfileBanner] = useState<File | null>(null);
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -135,6 +147,8 @@ export default function ArtistDashboardPage() {
         operationsApi.listRevenue()
       ]);
       setArtist(artistData);
+      setProfileBio(artistData.bio);
+      setProfileGenres(artistData.genreTags.join(", "));
       setTracks(trackData.results.filter((track) => track.artistId === artistProfileId));
       setAlbums(albumData.results.filter((album) => album.artistId === artistProfileId));
       setGenres(genreData);
@@ -180,11 +194,11 @@ export default function ArtistDashboardPage() {
   const createRelease = async () => {
     if (!draft.title.trim()) return setNotice("A release title is required.");
     if (draft.releaseType === "single" && !draft.singleFile) return setNotice("Select an audio file for the single.");
+    if (draft.releaseType === "album" && draft.albumTracks.length < 2) return setNotice("An album needs at least two tracks.");
     if (draft.releaseType === "album" && draft.albumTracks.some((track) => !track.file || !track.title.trim())) return setNotice("Every album track needs a title and audio file.");
 
     setBusy(true);
     setNotice("");
-    let createdAlbumId: string | null = null;
     try {
       if (draft.releaseType === "single") {
         const formData = new FormData();
@@ -202,27 +216,20 @@ export default function ArtistDashboardPage() {
         albumData.set("isEarlyAccess", String(draft.isEarlyAccess));
         if (draft.genreId) albumData.set("genreId", draft.genreId);
         if (draft.cover) albumData.set("coverImage", draft.cover);
-        const album = await artistCatalogApi.createAlbum(albumData);
-        createdAlbumId = album.id;
-
-        for (let index = 0; index < draft.albumTracks.length; index += 1) {
-          const albumTrack = draft.albumTracks[index];
-          const trackData = new FormData();
-          trackData.set("title", albumTrack.title.trim());
-          trackData.set("audioFile", albumTrack.file as File);
-          trackData.set("durationSeconds", String(albumTrack.durationSeconds));
-          trackData.set("lyrics", albumTrack.lyrics.trim());
-          trackData.set("albumId", album.id);
-          trackData.set("trackNumber", String(index + 1));
-          appendCommonTrackFields(trackData, draft);
-          await artistCatalogApi.createTrack(trackData);
-        }
+        albumData.set("explicit", String(draft.explicit));
+        draft.collaborators.split(",").map((value) => value.trim()).filter(Boolean).forEach((value) => albumData.append("collaboratorIds", value));
+        draft.albumTracks.forEach((albumTrack) => {
+          albumData.append("trackTitles", albumTrack.title.trim());
+          albumData.append("trackFiles", albumTrack.file as File);
+          albumData.append("trackDurations", String(albumTrack.durationSeconds));
+          albumData.append("trackLyrics", albumTrack.lyrics.trim());
+        });
+        await artistCatalogApi.createAlbumRelease(albumData);
       }
       setDraft(initialDraft());
       setNotice("Release saved successfully.");
       await loadData();
     } catch (error) {
-      if (createdAlbumId) await artistCatalogApi.deleteAlbum(createdAlbumId).catch(() => undefined);
       setNotice(errorMessage(error));
     } finally {
       setBusy(false);
@@ -249,6 +256,14 @@ export default function ArtistDashboardPage() {
     setEditTitle(release.value.title);
     setEditStatus(release.value.status ?? "draft");
     setEditLyrics(release.kind === "track" ? release.value.lyrics ?? "" : "");
+    setEditReleaseDate(release.value.releaseDate);
+    setEditGenreId(release.value.genreId ? String(release.value.genreId) : "");
+    setEditEarlyAccess(release.value.isEarlyAccess ?? false);
+    setEditExplicit(release.kind === "track" ? release.value.explicit : false);
+    setEditCollaborators(release.kind === "track" ? (release.value.collaboratorIds ?? []).join(", ") : "");
+    setEditCover(null);
+    setEditAudio(null);
+    setEditDuration(release.kind === "track" ? release.value.durationSeconds : 0);
   };
 
   const saveEdit = async () => {
@@ -256,7 +271,19 @@ export default function ArtistDashboardPage() {
     const data = new FormData();
     data.set("title", editTitle.trim());
     data.set("status", editStatus);
-    if (editing.kind === "track") data.set("lyrics", editLyrics.trim());
+    data.set("releaseDate", editReleaseDate);
+    data.set("genreId", editGenreId);
+    data.set("isEarlyAccess", String(editEarlyAccess));
+    if (editCover) data.set("coverImage", editCover);
+    if (editing.kind === "track") {
+      data.set("lyrics", editLyrics.trim());
+      data.set("explicit", String(editExplicit));
+      if (editAudio) data.set("audioFile", editAudio);
+      if (editAudio) data.set("durationSeconds", String(editDuration));
+      const collaborators = editCollaborators.split(",").map((value) => value.trim()).filter(Boolean);
+      if (collaborators.length === 0) data.set("clearCollaborators", "true");
+      else collaborators.forEach((value) => data.append("collaboratorIds", value));
+    }
     setBusy(true);
     try {
       if (editing.kind === "track") await artistCatalogApi.updateTrack(editing.value.id, data);
@@ -271,10 +298,41 @@ export default function ArtistDashboardPage() {
     }
   };
 
-  const totalStreams = tracks.reduce((sum, track) => sum + (track.playCount ?? 0), 0);
-  const totalListeners = tracks.reduce((sum, track) => sum + (track.uniqueListeners ?? 0), 0);
-  const totalRevenue = revenue.reduce((sum, record) => sum + record.netRevenueCents, 0);
-  const currency = revenue[0]?.currency ?? "USD";
+  const saveArtistProfile = async () => {
+    if (!artistProfileId) return;
+    const data = new FormData();
+    data.set("bio", profileBio.trim());
+    const genreTags = profileGenres.split(",").map((value) => value.trim()).filter(Boolean);
+    if (genreTags.length === 0) data.append("genreTags", "");
+    else genreTags.forEach((value) => data.append("genreTags", value));
+    if (profileImage) data.set("profileImage", profileImage);
+    if (profileBanner) data.set("bannerImage", profileBanner);
+    setBusy(true);
+    try {
+      const updated = await artistCatalogApi.updateArtistProfile(artistProfileId, data);
+      setArtist(updated);
+      setProfileImage(null);
+      setProfileBanner(null);
+      setNotice("Artist profile updated.");
+    } catch (error) {
+      setNotice(errorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const currencyBreakdown = overview?.currencyBreakdown ?? [];
+  const netRevenueLabel = currencyBreakdown.length === 0
+    ? "No revenue"
+    : currencyBreakdown.length === 1
+      ? formatCurrencyFromCents(currencyBreakdown[0].artistPayoutCents, currencyBreakdown[0].currency)
+      : `${currencyBreakdown.length} currencies`;
+
+  const trackRevenueLabel = (trackId: string) => {
+    const rows = overview?.trackRevenueBreakdown.filter((row) => row.trackId === trackId) ?? [];
+    if (rows.length === 0) return "No revenue";
+    return rows.map((row) => formatCurrencyFromCents(row.netRevenueCents, row.currency ?? "USD")).join(" · ");
+  };
 
   const trackColumns: TableColumn<Track>[] = [
     { key: "track", header: "Track", render: (row) => <div><p className="font-medium text-slate-50">{row.title}</p><p className="text-xs text-slate-400">{row.albumTitle ?? "Single"}</p></div> },
@@ -282,6 +340,7 @@ export default function ArtistDashboardPage() {
     { key: "duration", header: "Duration", render: (row) => formatDuration(row.durationSeconds) },
     { key: "streams", header: "Streams", render: (row) => formatNumber(row.playCount ?? 0) },
     { key: "listeners", header: "Listeners", render: (row) => formatNumber(row.uniqueListeners ?? 0) },
+    { key: "revenue", header: "Net revenue", render: (row) => trackRevenueLabel(row.id) },
     { key: "actions", header: "Actions", render: (row) => <div className="flex gap-2"><Button onClick={() => openEdit({ kind: "track", value: row })} size="sm" variant="secondary">Edit</Button><Button onClick={() => void deleteRelease({ kind: "track", value: row })} size="sm" variant="danger">Delete</Button></div> }
   ];
 
@@ -331,7 +390,7 @@ export default function ArtistDashboardPage() {
         <div className="mt-5 space-y-4">
           {draft.albumTracks.map((track, index) => (
             <Card key={track.id}>
-              <div className="flex items-center justify-between"><h3 className="font-medium text-slate-50">Track {index + 1}</h3><Button disabled={draft.albumTracks.length === 1} onClick={() => setDraft((value) => ({ ...value, albumTracks: value.albumTracks.filter((item) => item.id !== track.id) }))} size="sm" variant="danger">Remove</Button></div>
+              <div className="flex items-center justify-between"><h3 className="font-medium text-slate-50">Track {index + 1}</h3><Button disabled={draft.albumTracks.length <= 2} onClick={() => setDraft((value) => ({ ...value, albumTracks: value.albumTracks.filter((item) => item.id !== track.id) }))} size="sm" variant="danger">Remove</Button></div>
               <div className="mt-3 grid gap-3 md:grid-cols-2">
                 <Input label="Track title" onChange={(event) => setDraft((value) => ({ ...value, albumTracks: value.albumTracks.map((item) => item.id === track.id ? { ...item, title: event.target.value } : item) }))} value={track.title} />
                 <Input accept="audio/mpeg,audio/wav,audio/flac,audio/mp4,audio/ogg" label="Audio file" onChange={(event) => void chooseAlbumFile(track.id, event.target.files?.[0] ?? null)} type="file" />
@@ -346,26 +405,41 @@ export default function ArtistDashboardPage() {
     </Card>
   );
 
+  const profilePanel = (
+    <Card>
+      <h2 className="text-lg font-semibold text-slate-50">Public artist profile</h2>
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <Textarea className="md:col-span-2" label="Biography" onChange={(event) => setProfileBio(event.target.value)} rows={6} value={profileBio} />
+        <Input helperText="Comma-separated genres" label="Genre tags" onChange={(event) => setProfileGenres(event.target.value)} value={profileGenres} />
+        <Input accept="image/*" label="Profile image" onChange={(event) => setProfileImage(event.target.files?.[0] ?? null)} type="file" />
+        <Input accept="image/*" label="Banner image" onChange={(event) => setProfileBanner(event.target.files?.[0] ?? null)} type="file" />
+      </div>
+      <Button className="mt-4" disabled={busy} onClick={() => void saveArtistProfile()}>Save artist profile</Button>
+    </Card>
+  );
+
   return (
     <DashboardLayout eyebrow="Artist workspace">
       <PageHeader actions={<Button disabled={loading} onClick={() => void loadData()} variant="secondary">Refresh</Button>} description="Upload and manage releases, lyrics, cover images, statistics, and monthly revenue." title={artist?.stageName ?? "Artist dashboard"} />
       {notice ? <p className="mt-4 rounded-md border border-surface-600 bg-surface-800 p-3 text-sm text-slate-200">{notice}</p> : null}
       <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Published tracks" value={formatNumber(tracks.filter((track) => track.status === "published").length)} />
-        <StatCard label="Total streams" value={formatNumber(overview?.streams ?? totalStreams)} />
-        <StatCard label="Unique listeners" value={formatNumber(overview?.uniqueListeners ?? totalListeners)} />
-        <StatCard label="Net revenue" value={formatCurrencyFromCents(overview?.currencyBreakdown.reduce((sum, row) => sum + row.artistPayoutCents, 0) ?? totalRevenue, overview?.currencyBreakdown[0]?.currency ?? currency)} />
+        <StatCard label="Total streams" value={formatNumber(overview?.streams ?? 0)} />
+        <StatCard label="Unique listeners" value={formatNumber(overview?.uniqueListeners ?? 0)} />
+        <StatCard label="Net revenue" value={netRevenueLabel} />
       </section>
+      {currencyBreakdown.length > 1 ? <section className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{currencyBreakdown.map((row) => <Card key={row.currency}><p className="text-xs uppercase text-slate-400">{row.currency} net revenue</p><p className="mt-2 text-lg font-semibold text-slate-50">{formatCurrencyFromCents(row.artistPayoutCents, row.currency)}</p></Card>)}</section> : null}
       <section className="mt-6">
         <Tabs tabs={[
           { id: "upload", label: "New release", content: uploadPanel },
+          { id: "profile", label: "Artist profile", content: profilePanel },
           { id: "tracks", label: "Tracks", content: <Table columns={trackColumns} emptyMessage={loading ? "Loading tracks..." : "No tracks yet."} getRowKey={(row) => row.id} rows={tracks} /> },
           { id: "albums", label: "Albums", content: <Table columns={albumColumns} emptyMessage={loading ? "Loading albums..." : "No albums yet."} getRowKey={(row) => row.id} rows={albums} /> },
           { id: "revenue", label: "Accounting", content: <Table columns={revenueColumns} emptyMessage={loading ? "Loading accounting..." : "No monthly records yet."} getRowKey={(row) => row.id} rows={revenue} /> }
         ]} />
       </section>
       <Modal onClose={() => setEditing(null)} open={Boolean(editing)} title="Edit release">
-        {editing ? <div className="space-y-4"><Input label="Title" onChange={(event) => setEditTitle(event.target.value)} value={editTitle} /><Select label="Status" onChange={(event) => setEditStatus(event.target.value as ReleaseStatus)} options={[{ value: "draft", label: "Draft" }, { value: "published", label: "Published" }]} value={editStatus} />{editing.kind === "track" ? <Textarea label="Lyrics" onChange={(event) => setEditLyrics(event.target.value)} rows={6} value={editLyrics} /> : null}<Button disabled={busy} onClick={() => void saveEdit()}>Save changes</Button></div> : null}
+        {editing ? <div className="grid gap-4 md:grid-cols-2"><Input label="Title" onChange={(event) => setEditTitle(event.target.value)} value={editTitle} /><Select label="Status" onChange={(event) => setEditStatus(event.target.value as ReleaseStatus)} options={[{ value: "draft", label: "Draft" }, { value: "published", label: "Published" }]} value={editStatus} /><Input label="Release date" onChange={(event) => setEditReleaseDate(event.target.value)} type="date" value={editReleaseDate} /><Select label="Genre" onChange={(event) => setEditGenreId(event.target.value)} options={[{ value: "", label: "No genre" }, ...genres.map((genre) => ({ value: String(genre.id), label: genre.name }))]} value={editGenreId} /><Input accept="image/*" label="Replacement cover" onChange={(event) => setEditCover(event.target.files?.[0] ?? null)} type="file" /><label className="flex items-center gap-2 text-sm text-slate-200"><input checked={editEarlyAccess} onChange={(event) => setEditEarlyAccess(event.target.checked)} type="checkbox" /> Gold early access</label>{editing.kind === "track" ? <><Input accept="audio/*" label="Replacement audio" onChange={(event) => { const file = event.target.files?.[0] ?? null; setEditAudio(file); if (file) void readAudioDuration(file).then(setEditDuration).catch((error) => setNotice(errorMessage(error))); }} type="file" /><Input helperText="Comma-separated artist profile IDs" label="Collaborators" onChange={(event) => setEditCollaborators(event.target.value)} value={editCollaborators} /><label className="flex items-center gap-2 text-sm text-slate-200"><input checked={editExplicit} onChange={(event) => setEditExplicit(event.target.checked)} type="checkbox" /> Explicit content</label><Textarea className="md:col-span-2" label="Lyrics" onChange={(event) => setEditLyrics(event.target.value)} rows={6} value={editLyrics} /></> : null}<div className="md:col-span-2"><Button disabled={busy} onClick={() => void saveEdit()}>Save changes</Button></div></div> : null}
       </Modal>
     </DashboardLayout>
   );

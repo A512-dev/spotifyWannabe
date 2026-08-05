@@ -1,22 +1,36 @@
 from __future__ import annotations
 
+import mimetypes
+import re
 from datetime import date
+from urllib.parse import quote, urlencode
 
+from django.http import HttpResponse, StreamingHttpResponse
+from django.urls import reverse
 from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from music.models import Album, Genre, ListeningHistory, ReleaseStatus, Track
 from music.permissions import IsOwnerArtistOrReadOnly
 from music.serializers import (
-    AlbumSerializer, AlbumWriteSerializer, GenreSerializer, ListeningHistorySerializer,
+    AlbumReleaseCreateSerializer, AlbumSerializer, AlbumWriteSerializer, GenreSerializer, ListeningHistorySerializer,
     StreamCreateSerializer, StreamEventSerializer, TrackSerializer, TrackWriteSerializer,
 )
-from music.services import can_access_track, recommend_tracks, register_stream, track_statistics
+from music.services import (
+    can_access_track,
+    create_audio_access_token,
+    ensure_playback_available,
+    recommend_tracks,
+    register_stream,
+    resolve_audio_access_token,
+    track_statistics,
+)
 from operations.models import SubscriptionTier
 from subscriptions.services import get_current_subscription_tier
 
@@ -61,7 +75,19 @@ class AlbumViewSet(viewsets.ModelViewSet):
         return queryset
 
     def get_serializer_class(self):
+        if self.action == "create_release":
+            return AlbumReleaseCreateSerializer
         return AlbumWriteSerializer if self.action in {"create", "update", "partial_update"} else AlbumSerializer
+
+    @action(detail=False, methods=["post"], url_path="release")
+    def create_release(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        album = serializer.save()
+        return Response(
+            AlbumSerializer(album, context=self.get_serializer_context()).data,
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class TrackViewSet(viewsets.ModelViewSet):
@@ -104,6 +130,19 @@ class TrackViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         return TrackWriteSerializer if self.action in {"create", "update", "partial_update"} else TrackSerializer
 
+    def perform_destroy(self, instance):
+        if (
+            instance.album_id
+            and instance.album.status == ReleaseStatus.PUBLISHED
+            and instance.album.tracks.count() <= 2
+        ):
+            from rest_framework.exceptions import ValidationError
+
+            raise ValidationError(
+                {"album": "Draft the album before reducing it below two tracks."}
+            )
+        instance.delete()
+
     @action(detail=True, methods=["post"], url_path="stream", permission_classes=[IsAuthenticated])
     def stream(self, request, pk=None):
         track = self.get_object()
@@ -132,7 +171,95 @@ class TrackViewSet(viewsets.ModelViewSet):
         plan_tier = get_current_subscription_tier(request.user)
         if plan_tier not in {SubscriptionTier.SILVER, SubscriptionTier.GOLD}:
             return Response({"error": {"message": "Downloads require Silver or Gold access."}}, status=status.HTTP_403_FORBIDDEN)
-        return Response({"downloadUrl": request.build_absolute_uri(track.audio_file.url)})
+        token = create_audio_access_token(user=request.user, track=track, purpose="download")
+        path = reverse("music:track-audio-file", kwargs={"pk": track.pk})
+        return Response({"downloadUrl": request.build_absolute_uri(f"{path}?{urlencode({'token': token})}")})
+
+    @action(detail=True, methods=["get"], url_path="playback")
+    def playback(self, request, pk=None):
+        track = self.get_object()
+        ensure_playback_available(user=request.user, track=track)
+        token = create_audio_access_token(user=request.user, track=track, purpose="playback")
+        path = reverse("music:track-audio-file", kwargs={"pk": track.pk})
+        return Response({"streamUrl": request.build_absolute_uri(f"{path}?{urlencode({'token': token})}")})
+
+
+class TrackAudioFileView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    @staticmethod
+    def _chunks(file_object, remaining: int, chunk_size: int = 64 * 1024):
+        try:
+            while remaining > 0:
+                data = file_object.read(min(chunk_size, remaining))
+                if not data:
+                    break
+                remaining -= len(data)
+                yield data
+        finally:
+            file_object.close()
+
+    def get(self, request, pk):
+        user, track, purpose = resolve_audio_access_token(request.query_params.get("token", ""))
+        if str(track.pk) != str(pk):
+            return Response(
+                {"error": {"message": "This audio access link does not match the requested track."}},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if purpose == "playback":
+            ensure_playback_available(user=user, track=track)
+        else:
+            tier = get_current_subscription_tier(user)
+            if tier not in {SubscriptionTier.SILVER, SubscriptionTier.GOLD}:
+                return Response(
+                    {"error": {"message": "Downloads require Silver or Gold access."}},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+        file_size = track.audio_file.size
+        start, end = 0, max(file_size - 1, 0)
+        response_status = status.HTTP_200_OK
+        range_header = request.headers.get("Range", "")
+        if range_header:
+            match = re.fullmatch(r"bytes=(\d*)-(\d*)", range_header.strip())
+            if match is None or (not match.group(1) and not match.group(2)):
+                response = HttpResponse(status=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE)
+                response["Content-Range"] = f"bytes */{file_size}"
+                return response
+            if match.group(1):
+                start = int(match.group(1))
+                end = int(match.group(2)) if match.group(2) else end
+            else:
+                suffix_length = int(match.group(2))
+                start = max(file_size - suffix_length, 0)
+            if start >= file_size or end < start:
+                response = HttpResponse(status=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE)
+                response["Content-Range"] = f"bytes */{file_size}"
+                return response
+            end = min(end, file_size - 1)
+            response_status = status.HTTP_206_PARTIAL_CONTENT
+
+        file_object = track.audio_file.open("rb")
+        file_object.seek(start)
+        content_length = end - start + 1
+        content_type = mimetypes.guess_type(track.audio_file.name)[0] or "application/octet-stream"
+        response = StreamingHttpResponse(
+            self._chunks(file_object, content_length),
+            status=response_status,
+            content_type=content_type,
+        )
+        response["Accept-Ranges"] = "bytes"
+        response["Content-Length"] = str(content_length)
+        if response_status == status.HTTP_206_PARTIAL_CONTENT:
+            response["Content-Range"] = f"bytes {start}-{end}/{file_size}"
+        disposition = "attachment" if purpose == "download" else "inline"
+        filename = track.audio_file.name.rsplit("/", 1)[-1]
+        response["Content-Disposition"] = f"{disposition}; filename*=UTF-8''{quote(filename)}"
+        response["Cache-Control"] = "private, no-store"
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
 
 
 class ListeningHistoryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):

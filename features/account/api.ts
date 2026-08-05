@@ -1,5 +1,5 @@
 import { apiRequest, clearStoredToken, storeToken } from "@/lib/api";
-import type { Gender, User } from "@/types/domain";
+import type { Gender, PublicUser, User } from "@/types/domain";
 
 export interface AuthResponse {
   token: string;
@@ -40,7 +40,7 @@ export const accountApi = {
   },
 
   getUser(id: string) {
-    return apiRequest<User>(`/accounts/users/${id}/`);
+    return apiRequest<PublicUser>(`/accounts/users/${id}/`);
   },
 
   async registerListener(input: {
