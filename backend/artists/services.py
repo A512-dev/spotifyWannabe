@@ -18,8 +18,8 @@ def review_artist_application(
     review_note: str,
 ) -> ArtistApplication:
     locked_application = (
-        ArtistApplication.objects.select_for_update()
-        .select_related("applicant", "reviewed_by")
+        ArtistApplication.objects.select_related("applicant")
+        .select_for_update(of=("self",))
         .get(pk=application.pk)
     )
 

@@ -46,18 +46,17 @@ class RegisterArtistView(APIView):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def post(self, request):
-        data = request.data.copy()
-        if hasattr(request.data, "getlist"):
-            data.setlist("sampleFiles", request.data.getlist("sampleFiles"))
-            data.setlist("sampleLinks", request.data.getlist("sampleLinks"))
-        serializer = ArtistRegistrationSerializer(data=data)
+        serializer = ArtistRegistrationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user, application = serializer.save()
         token, _ = Token.objects.get_or_create(user=user)
         return Response(
             {
                 "token": token.key,
-                "user": UserSerializer(user, context={"request": request}).data,
+                "user": UserSerializer(
+                    user,
+                    context={"request": request},
+                ).data,
                 "artistApplicationId": str(application.pk),
                 "applicationStatus": application.status,
             },
