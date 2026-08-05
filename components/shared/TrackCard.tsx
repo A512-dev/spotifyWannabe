@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
+import type { KeyboardEvent, MouseEvent } from "react";
 import { Badge } from "@/components/ui/Badge";
+import { musicApi, type PlaylistWithItems } from "@/features/music/api";
+import { ApiError } from "@/lib/api";
 import { formatDuration, formatNumber } from "@/lib/formatters";
-import { usePlayer } from "@/providers/PlayerProvider";
-import type { KeyboardEvent } from "react";
+import { useAuth, usePlayer } from "@/providers";
 import type { Track } from "@/types/domain";
 
 interface TrackCardProps {
@@ -15,25 +18,22 @@ interface TrackCardProps {
 }
 
 export function TrackCard({ artistName, contextQueue, onSelect, track }: TrackCardProps) {
-  const playerContext = usePlayer();
+  const { currentUser } = useAuth();
+  const player = usePlayer();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [playlists, setPlaylists] = useState<PlaylistWithItems[]>([]);
+  const [loadingPlaylists, setLoadingPlaylists] = useState(false);
+  const [menuMessage, setMenuMessage] = useState("");
 
   const handleCardClick = () => {
-    if (onSelect) {
-      onSelect(track);
-      return;
-    }
-
-    if (contextQueue && contextQueue.length > 0) {
-      localStorage.setItem("soundwave_active_queue", JSON.stringify(contextQueue));
-    } else {
-      localStorage.removeItem("soundwave_active_queue");
-    }
-
-    playerContext.setPlayerState({
-      ...playerContext.playerState,
+    if (onSelect) return onSelect(track);
+    if (contextQueue?.length) localStorage.setItem("soundwave_active_queue", JSON.stringify(contextQueue));
+    else localStorage.removeItem("soundwave_active_queue");
+    player.setPlayerState({
+      ...player.playerState,
       currentTrackId: track.id,
-      queueTrackIds: contextQueue && contextQueue.length > 0 ? contextQueue : playerContext.playerState.queueTrackIds,
-      isPlaying: true
+      queueTrackIds: contextQueue?.length ? contextQueue : player.playerState.queueTrackIds,
+      isPlaying: true,
     });
   };
 
@@ -44,68 +44,91 @@ export function TrackCard({ artistName, contextQueue, onSelect, track }: TrackCa
     }
   };
 
+  const stop = (event: MouseEvent) => {
+    event.stopPropagation();
+  };
+
+  const openMenu = async (event: MouseEvent<HTMLButtonElement>) => {
+    stop(event);
+    const opening = !menuOpen;
+    setMenuOpen(opening);
+    setMenuMessage("");
+    if (!opening || playlists.length > 0) return;
+    setLoadingPlaylists(true);
+    try {
+      const response = await musicApi.listPlaylists();
+      setPlaylists(response.results);
+    } catch (error) {
+      setMenuMessage(error instanceof ApiError ? error.message : "Playlists could not be loaded.");
+    } finally {
+      setLoadingPlaylists(false);
+    }
+  };
+
+  const togglePlaylist = async (playlist: PlaylistWithItems) => {
+    const containsTrack = playlist.items?.some((item) => item.track.id === track.id) ?? false;
+    setMenuMessage("");
+    try {
+      if (containsTrack) await musicApi.removeTrackFromPlaylist(playlist.id, track.id);
+      else await musicApi.addTrackToPlaylist(playlist.id, track.id);
+      const response = await musicApi.listPlaylists();
+      setPlaylists(response.results);
+    } catch (error) {
+      setMenuMessage(error instanceof ApiError ? error.message : "The playlist could not be updated.");
+    }
+  };
+
+  const downloadTrack = async () => {
+    setMenuMessage("");
+    try {
+      const { downloadUrl } = await musicApi.download(track.id);
+      const anchor = document.createElement("a");
+      anchor.href = downloadUrl;
+      anchor.download = track.title;
+      anchor.rel = "noopener";
+      anchor.click();
+    } catch (error) {
+      setMenuMessage(error instanceof ApiError ? error.message : "The track could not be downloaded.");
+    }
+  };
+
   return (
-    <div 
-      className="w-full cursor-pointer focus:outline-none" 
-      onClick={handleCardClick} 
-      onKeyDown={handleKeyDown} 
-      role="button" 
-      tabIndex={0}
-    >
-      {/* سطر افقی شیشه‌ای با افکت هاور ملایم */}
-      <div className="flex w-full items-center gap-4 rounded-xl border border-white/5 bg-white/[0.02] p-3 transition-all duration-200 hover:bg-white/[0.06] hover:border-brand-secondary/20 hover:shadow-md group">
-        
-        {/* کاور آهنگ */}
-        {track.coverImageUrl ? (
-          <img
-            alt={`${track.title} cover`}
-            className="h-12 w-12 shrink-0 rounded-md object-cover shadow"
-            src={track.coverImageUrl}
-          />
-        ) : (
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-brand-primary/20 text-xs text-white/40">
-            Cover
-          </div>
-        )}
-
-        {/* اطلاعات آهنگ و خواننده */}
-        <div className="min-w-0 flex-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-4">
+    <div className="relative w-full cursor-pointer focus:outline-none" onClick={handleCardClick} onKeyDown={handleKeyDown} role="button" tabIndex={0}>
+      <div className="group flex w-full items-center gap-4 rounded-xl border border-white/5 bg-white/[0.02] p-3 transition-all hover:border-brand-secondary/20 hover:bg-white/[0.06] hover:shadow-md">
+        {track.coverImageUrl ? <img alt={`${track.title} cover`} className="h-12 w-12 shrink-0 rounded-md object-cover shadow" src={track.coverImageUrl} /> : <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-brand-primary/20 text-xs text-white/40">Cover</div>}
+        <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <div className="min-w-0">
-            <p className="truncate font-bold text-white group-hover:text-brand-secondary transition-colors text-sm sm:text-base">
-              {track.title}
-            </p>
-            {artistName ? (
-              <Link
-                className="inline-block truncate text-xs sm:text-sm text-white/70 hover:text-white hover:underline transition-colors mt-0.5"
-                href={`/artist/${track.artistId}`}
-                onClick={(event) => event.stopPropagation()}
-              >
-                {artistName}
-              </Link>
-            ) : (
-              <p className="truncate text-xs sm:text-sm text-white/40 mt-0.5">Unknown artist</p>
-            )}
+            <p className="truncate text-sm font-bold text-white transition-colors group-hover:text-brand-secondary sm:text-base">{track.title}</p>
+            <div className="flex min-w-0 items-center gap-1.5 text-xs text-white/70 sm:text-sm">
+              {artistName ? <Link className="truncate hover:text-white hover:underline" href={`/artist/${track.artistId}`} onClick={stop}>{artistName}</Link> : <span className="text-white/40">Unknown artist</span>}
+              {track.albumId ? <><span className="text-white/30">•</span><Link className="truncate hover:text-white hover:underline" href={`/music/album/${track.albumId}`} onClick={stop}>{track.albumTitle ?? "Album"}</Link></> : null}
+            </div>
           </div>
-
-          {/* اطلاعات مدت زمان و تعداد پخش در سمت راست سطر */}
-          <div className="flex items-center gap-3 shrink-0 text-xs text-white/40 font-medium sm:text-right">
+          <div className="flex shrink-0 items-center gap-3 text-xs font-medium text-white/40">
             <span>{formatDuration(track.durationSeconds)}</span>
-            {typeof track.playCount === "number" ? (
-              <>
-                <span className="text-[10px] opacity-40">•</span>
-                <span>{formatNumber(track.playCount)} plays</span>
-              </>
-            ) : null}
+            {typeof track.playCount === "number" ? <span>{formatNumber(track.playCount)} plays</span> : null}
           </div>
         </div>
-
-        {/* نشان بدج تصنیف برای محتوای رکیک در صورت وجود */}
-        {track.explicit ? (
-          <div className="shrink-0">
-            <Badge tone="warning">Explicit</Badge>
-          </div>
-        ) : null}
+        {track.explicit ? <Badge tone="warning">Explicit</Badge> : null}
+        <button aria-label={`Manage ${track.title}`} className="rounded-md px-2 py-1 text-lg text-white/60 hover:bg-white/10 hover:text-white" onClick={(event) => void openMenu(event)} type="button">⋮</button>
       </div>
+
+      {menuOpen ? (
+        <div className="absolute right-2 top-[calc(100%+0.25rem)] z-30 w-72 cursor-default rounded-xl border border-white/10 bg-[#160926]/98 p-3 shadow-2xl" onClick={stop} role="menu">
+          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-white/50">Manage playlists</p>
+          {loadingPlaylists ? <p className="text-sm text-white/60">Loading playlists...</p> : null}
+          <div className="max-h-48 space-y-1 overflow-y-auto">
+            {playlists.map((playlist) => {
+              const checked = playlist.items?.some((item) => item.track.id === track.id) ?? false;
+              return <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-white/80 hover:bg-white/10" key={playlist.id}><input checked={checked} onChange={() => void togglePlaylist(playlist)} type="checkbox" />{playlist.title}</label>;
+            })}
+            {!loadingPlaylists && playlists.length === 0 ? <p className="text-sm text-white/50">Create a playlist first.</p> : null}
+          </div>
+          {currentUser?.subscriptionTier === "silver" || currentUser?.subscriptionTier === "gold" ? <button className="mt-3 w-full rounded-md bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/15" onClick={() => void downloadTrack()} type="button">Download track</button> : null}
+          {menuMessage ? <p className="mt-2 text-xs text-rose-300">{menuMessage}</p> : null}
+          <button className="mt-2 w-full text-xs text-white/50 hover:text-white" onClick={() => setMenuOpen(false)} type="button">Close</button>
+        </div>
+      ) : null}
     </div>
   );
 }

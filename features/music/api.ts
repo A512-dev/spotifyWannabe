@@ -56,6 +56,9 @@ export const musicApi = {
       body: JSON.stringify({ sessionId, listenedSeconds })
     });
   },
+  playback(trackId: string) {
+    return apiRequest<{ streamUrl: string }>(`/music/tracks/${trackId}/playback/`);
+  },
   download(trackId: string) {
     return apiRequest<{ downloadUrl: string }>(`/music/tracks/${trackId}/download/`);
   },
@@ -66,6 +69,12 @@ export const musicApi = {
     return apiRequest<PlaylistWithItems>("/playlists/", {
       method: "POST",
       body: JSON.stringify({ title, description: "", isPublic: false })
+    });
+  },
+  savePlaylist(data: FormData, id?: string) {
+    return apiRequest<PlaylistWithItems>(id ? `/playlists/${id}/` : "/playlists/", {
+      method: id ? "PATCH" : "POST",
+      body: data,
     });
   },
   renamePlaylist(id: string, title: string) {
@@ -111,6 +120,8 @@ export interface ArtistProfileApi {
   monthlyListeners: number | null;
   trackCount: number;
   albumCount: number;
+  totalStreams: number | null;
+  isFollowing: boolean;
 }
 
 export interface TrackStatsApi {
@@ -128,6 +139,9 @@ export const artistCatalogApi = {
   getArtistProfile(id: string) {
     return apiRequest<ArtistProfileApi>(`/artists/profiles/${id}/`);
   },
+  updateArtistProfile(id: string, data: FormData) {
+    return apiRequest<ArtistProfileApi>(`/artists/profiles/${id}/`, { method: "PATCH", body: data });
+  },
   followUser(userId: string) {
     return apiRequest<{ isFollowing: boolean; followerCount: number }>(`/accounts/users/${userId}/follow/`, {
       method: "POST"
@@ -140,6 +154,9 @@ export const artistCatalogApi = {
   },
   createAlbum(data: FormData) {
     return apiRequest<Album>("/music/albums/", { method: "POST", body: data });
+  },
+  createAlbumRelease(data: FormData) {
+    return apiRequest<Album>("/music/albums/release/", { method: "POST", body: data });
   },
   updateAlbum(id: string, data: FormData) {
     return apiRequest<Album>(`/music/albums/${id}/`, { method: "PATCH", body: data });

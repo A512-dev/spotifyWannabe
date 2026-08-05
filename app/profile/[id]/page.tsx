@@ -9,12 +9,12 @@ import { ApiError } from "@/lib/api";
 import { formatDate, formatNumber } from "@/lib/formatters";
 import { getRoleLabel, getSubscriptionLabel } from "@/lib/labels";
 import { useAuth } from "@/providers";
-import type { User } from "@/types/domain";
+import type { PublicUser } from "@/types/domain";
 
 export default function PublicUserProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { currentUser } = useAuth();
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<PublicUser | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 

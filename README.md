@@ -248,7 +248,7 @@ python manage.py test -v 2
 Validated on the delivery version:
 
 ```text
-Found 116 test(s).
+Found 120 test(s).
 No changes detected
 System check identified no issues
 OK

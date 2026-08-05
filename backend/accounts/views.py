@@ -20,9 +20,10 @@ from accounts.serializers import (
     PasswordResetRequestSerializer,
     PreferenceSerializer,
     ProfileUpdateSerializer,
+    PublicUserSerializer,
     UserSerializer,
 )
-from accounts.services import logout_user
+from accounts.services import deactivate_user_account, logout_user
 
 User = get_user_model()
 
@@ -46,18 +47,17 @@ class RegisterArtistView(APIView):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def post(self, request):
-        data = request.data.copy()
-        if hasattr(request.data, "getlist"):
-            data.setlist("sampleFiles", request.data.getlist("sampleFiles"))
-            data.setlist("sampleLinks", request.data.getlist("sampleLinks"))
-        serializer = ArtistRegistrationSerializer(data=data)
+        serializer = ArtistRegistrationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user, application = serializer.save()
         token, _ = Token.objects.get_or_create(user=user)
         return Response(
             {
                 "token": token.key,
-                "user": UserSerializer(user, context={"request": request}).data,
+                "user": UserSerializer(
+                    user,
+                    context={"request": request},
+                ).data,
                 "artistApplicationId": str(application.pk),
                 "applicationStatus": application.status,
             },
@@ -103,9 +103,7 @@ class MeView(APIView):
         return Response(UserSerializer(request.user, context={"request": request}).data)
 
     def delete(self, request):
-        user = request.user
-        logout_user(user=user)
-        user.delete()
+        deactivate_user_account(user=request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -143,8 +141,8 @@ class PasswordResetConfirmView(APIView):
 
 
 class UserViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
-    queryset = User.objects.select_related("profile").all()
-    serializer_class = UserSerializer
+    queryset = User.objects.filter(is_active=True).select_related("profile")
+    serializer_class = PublicUserSerializer
     permission_classes = [IsAuthenticated]
 
     @action(detail=True, methods=["post", "delete"], url_path="follow")

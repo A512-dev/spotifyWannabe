@@ -29,6 +29,7 @@ export default function ArtistProfilePage({ params }: ArtistProfilePageProps) {
     ]).then(([profile, trackData, albumData]) => {
       if (!active) return;
       setArtist(profile);
+      setFollowing(profile.isFollowing);
       setTracks(trackData.results.filter((track) => track.artistId === id));
       setAlbums(albumData.results.filter((album) => album.artistId === id));
     }).catch((requestError) => {
@@ -64,8 +65,9 @@ export default function ArtistProfilePage({ params }: ArtistProfilePageProps) {
           </div>
         </div>
       </section>
-      <section className="mt-6 grid gap-4 md:grid-cols-3">
+      <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card><p className="text-sm text-slate-400">Monthly listeners</p><p className="mt-2 text-2xl font-semibold text-slate-50">{artist.monthlyListeners === null ? "Gold only" : formatNumber(artist.monthlyListeners)}</p></Card>
+        <Card><p className="text-sm text-slate-400">Total streams</p><p className="mt-2 text-2xl font-semibold text-slate-50">{artist.totalStreams === null ? "Gold only" : formatNumber(artist.totalStreams)}</p></Card>
         <Card><p className="text-sm text-slate-400">Followers</p><p className="mt-2 text-2xl font-semibold text-slate-50">{formatNumber(artist.followerCount)}</p></Card>
         <Card><p className="text-sm text-slate-400">Genres</p><div className="mt-3 flex flex-wrap gap-2">{artist.genreTags.length ? artist.genreTags.map((genre) => <Badge key={genre}>{genre}</Badge>) : <span className="text-sm text-slate-500">Not specified</span>}</div></Card>
       </section>

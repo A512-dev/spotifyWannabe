@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date
 
+from django.contrib.auth import get_user_model
+from django.core import signing
 from django.db import transaction
 from django.db.models import F, Sum
 from django.utils import timezone
@@ -15,6 +17,10 @@ from subscriptions.services import current_plan_for, get_current_subscription_ti
 MIN_STREAM_SECONDS = 30
 BASIC_DAILY_STREAM_LIMIT = 60
 STREAM_REPORT_GRACE_SECONDS = 3
+AUDIO_ACCESS_TOKEN_MAX_AGE_SECONDS = 60 * 60
+AUDIO_ACCESS_TOKEN_SALT = "soundwave.music.audio-access.v1"
+
+User = get_user_model()
 
 
 def can_access_track(*, user, track: Track) -> bool:
@@ -30,6 +36,50 @@ def can_access_track(*, user, track: Track) -> bool:
             and get_current_subscription_tier(user) == SubscriptionTier.GOLD
         )
     return True
+
+
+def ensure_playback_available(*, user, track: Track) -> None:
+    if not can_access_track(user=user, track=track):
+        raise PermissionDenied("This track is not available for your subscription.")
+    if get_current_subscription_tier(user) != SubscriptionTier.BASIC:
+        return
+    daily_count = StreamEvent.objects.filter(
+        listener=user,
+        streamed_on=timezone.localdate(),
+        counted=True,
+    ).count()
+    if daily_count >= BASIC_DAILY_STREAM_LIMIT:
+        raise PermissionDenied("The Basic plan daily stream limit has been reached.")
+
+
+def create_audio_access_token(*, user, track: Track, purpose: str) -> str:
+    if purpose not in {"playback", "download"}:
+        raise ValueError("Unsupported audio token purpose.")
+    return signing.dumps(
+        {"userId": str(user.pk), "trackId": str(track.pk), "purpose": purpose},
+        salt=AUDIO_ACCESS_TOKEN_SALT,
+        compress=True,
+    )
+
+
+def resolve_audio_access_token(token: str) -> tuple[object, Track, str]:
+    try:
+        payload = signing.loads(
+            token,
+            salt=AUDIO_ACCESS_TOKEN_SALT,
+            max_age=AUDIO_ACCESS_TOKEN_MAX_AGE_SECONDS,
+        )
+    except signing.BadSignature as exc:
+        raise PermissionDenied("This audio access link is invalid or expired.") from exc
+
+    user = User.objects.filter(pk=payload.get("userId"), is_active=True).first()
+    track = Track.objects.select_related("artist", "album").filter(
+        pk=payload.get("trackId")
+    ).first()
+    purpose = payload.get("purpose")
+    if user is None or track is None or purpose not in {"playback", "download"}:
+        raise PermissionDenied("This audio access link is invalid or expired.")
+    return user, track, purpose
 
 
 @transaction.atomic
@@ -67,6 +117,9 @@ def register_stream(*, user, track: Track, session_id: str, listened_seconds: in
     listened_seconds = max(existing.listened_seconds, verified_seconds)
     will_count = existing_was_counted or listened_seconds >= MIN_STREAM_SECONDS
     if tier == SubscriptionTier.BASIC and will_count and not (existing and existing.counted):
+        # Serialize the per-user limit check so concurrent stream reports cannot
+        # both observe 59 and become the sixtieth counted stream.
+        User.objects.select_for_update().get(pk=user.pk)
         daily_count = StreamEvent.objects.filter(listener=user, streamed_on=today, counted=True).count()
         if daily_count >= BASIC_DAILY_STREAM_LIMIT:
             raise PermissionDenied("The Basic plan daily stream limit has been reached.")

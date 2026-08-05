@@ -94,6 +94,26 @@ class UserSerializer(serializers.ModelSerializer):
         return UserFollow.objects.filter(follower=request.user, following=obj).exists()
 
 
+class PublicUserSerializer(UserSerializer):
+    """Deliberately excludes private account and authentication metadata."""
+
+    class Meta(UserSerializer.Meta):
+        fields = [
+            "id",
+            "username",
+            "displayName",
+            "role",
+            "subscriptionTier",
+            "avatarUrl",
+            "artistProfileId",
+            "createdAt",
+            "followerCount",
+            "followingCount",
+            "dailyStreamCount",
+            "isFollowing",
+        ]
+
+
 class ListenerRegistrationSerializer(serializers.Serializer):
     displayName = serializers.CharField(max_length=120)
     email = serializers.EmailField()

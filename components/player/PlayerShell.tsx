@@ -1,200 +1,227 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { PlayerControlsPlaceholder } from "@/components/player/PlayerControlsPlaceholder";
 import { PlayerTrackSummary } from "@/components/player/PlayerTrackSummary";
 import { musicApi } from "@/features/music/api";
+import { ApiError } from "@/lib/api";
 import { usePlayer } from "@/providers/PlayerProvider";
-import { formatDuration } from "@/lib/formatters";
 import type { Track } from "@/types/domain";
+
+const QUEUE_STORAGE_KEY = "soundwave_active_queue";
 
 export function PlayerShell() {
   const { playerState, setPlayerState, tracks } = usePlayer();
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const currentTrack = tracks.find((track) => track.id === playerState.currentTrackId);
-  const currentArtist = currentTrack?.artistName ? { stageName: currentTrack.artistName } : null;
-  const streamSessionRef = useRef<string>("");
+  const streamSessionRef = useRef("");
   const streamStartedRef = useRef(false);
   const streamRequestPendingRef = useRef(false);
   const lastStreamReportRef = useRef(0);
+  const currentTrack = tracks.find((track) => track.id === playerState.currentTrackId);
 
-  const [activeQueue, setActiveQueue] = useState<Track[]>(tracks);
+  const [activeQueue, setActiveQueue] = useState<Track[]>([]);
+  const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const [playerError, setPlayerError] = useState("");
   const [isMobileExpanded, setIsMobileExpanded] = useState(false);
   const [isQueueOpen, setIsQueueOpen] = useState(false);
-  const [isLyricsOpen, setIsLyricsOpen] = useState(false); // استیت جدید برای کنترل متن آهنگ
+  const [isLyricsOpen, setIsLyricsOpen] = useState(false);
   const [progress, setProgress] = useState(0);
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState<"off" | "all" | "one">("off");
   const volume = playerState.volume ?? 100;
 
+  const persistQueue = useCallback((queue: Track[]) => {
+    setActiveQueue(queue);
+    const ids = queue.map((track) => track.id);
+    localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(ids));
+    setPlayerState((state) => ({ ...state, queueTrackIds: ids }));
+  }, [setPlayerState]);
+
   useEffect(() => {
-    setProgress(0);
-    setIsLyricsOpen(false); // با تغییر آهنگ، پنل متن بازنشانی شود
-    const queueJson = localStorage.getItem("soundwave_active_queue");
-    if (queueJson) {
+    let queueIds = playerState.queueTrackIds;
+    if (queueIds.length === 0) {
       try {
-        const trackIds = JSON.parse(queueJson) as string[];
-        const queueTracks = trackIds.map(id => tracks.find(t => t.id === id)).filter((t): t is Track => Boolean(t));
-        setActiveQueue(queueTracks.length > 0 ? queueTracks : tracks);
+        queueIds = JSON.parse(localStorage.getItem(QUEUE_STORAGE_KEY) ?? "[]") as string[];
       } catch {
-        setActiveQueue(tracks);
-      }
-    } else {
-      setActiveQueue(tracks);
-    }
-  }, [playerState.currentTrackId, tracks]);
-
-  const handleNext = useCallback(() => {
-    if (!currentTrack) return;
-    let nextTrackId = currentTrack.id;
-
-    if (shuffle) {
-      const otherTracks = activeQueue.filter((t) => t.id !== currentTrack.id);
-      const randomTrack = otherTracks[Math.floor(Math.random() * otherTracks.length)];
-      nextTrackId = randomTrack?.id || currentTrack.id;
-    } else {
-      const currentIndex = activeQueue.findIndex((t) => t.id === currentTrack.id);
-      if (currentIndex !== -1 && currentIndex < activeQueue.length - 1) {
-        nextTrackId = activeQueue[currentIndex + 1].id;
-      } else if (repeat === "all") {
-        nextTrackId = activeQueue[0].id;
-      } else {
-        if (setPlayerState) {
-          setPlayerState({ ...playerState, isPlaying: false, currentTrackId: activeQueue[0].id });
-        }
-        setProgress(0);
-        return;
+        queueIds = [];
       }
     }
-
-    if (setPlayerState) {
-      setPlayerState({ ...playerState, currentTrackId: nextTrackId, isPlaying: true });
-    }
-  }, [currentTrack, shuffle, repeat, playerState, setPlayerState, activeQueue]);
-
-  const handlePrevious = useCallback(() => {
-    if (!currentTrack || !setPlayerState) return;
-    
-    if (progress > 3) {
-      setProgress(0);
-      return;
-    }
-    
-    const currentIndex = activeQueue.findIndex((t) => t.id === currentTrack.id);
-    if (currentIndex > 0) {
-      setPlayerState({ ...playerState, currentTrackId: activeQueue[currentIndex - 1].id, isPlaying: true });
-    } else if (repeat === "all") {
-      setPlayerState({ ...playerState, currentTrackId: activeQueue[activeQueue.length - 1].id, isPlaying: true });
-    } else {
-      setProgress(0);
-    }
-  }, [currentTrack, progress, repeat, playerState, setPlayerState, activeQueue]);
+    const byId = new Map(tracks.map((track) => [track.id, track]));
+    const queue = queueIds.map((id) => byId.get(id)).filter((track): track is Track => Boolean(track));
+    if (currentTrack && !queue.some((track) => track.id === currentTrack.id)) queue.unshift(currentTrack);
+    setActiveQueue(queue.length > 0 ? queue : tracks);
+  }, [currentTrack, playerState.queueTrackIds, tracks]);
 
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio || !currentTrack) return;
-    audio.load();
+    let active = true;
     setProgress(0);
+    setPlayerError("");
+    setStreamUrl(null);
+    setIsLyricsOpen(false);
     streamSessionRef.current = `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     streamStartedRef.current = false;
     streamRequestPendingRef.current = false;
     lastStreamReportRef.current = 0;
-  }, [currentTrack]);
+
+    if (!currentTrack) return () => { active = false; };
+    void musicApi.playback(currentTrack.id)
+      .then(({ streamUrl: authorizedUrl }) => {
+        if (active) setStreamUrl(authorizedUrl);
+      })
+      .catch((error) => {
+        if (!active) return;
+        setPlayerError(error instanceof ApiError ? error.message : "This track could not be opened.");
+        setPlayerState((state) => ({ ...state, isPlaying: false }));
+      });
+    return () => { active = false; };
+  }, [currentTrack, setPlayerState]);
 
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio) return;
-
+    if (!audio || !streamUrl) return;
+    audio.load();
     if (playerState.isPlaying) {
       void audio.play().catch(() => {
-        setPlayerState({ ...playerState, isPlaying: false });
+        setPlayerError("Playback could not start. Try selecting the track again.");
+        setPlayerState((state) => ({ ...state, isPlaying: false }));
       });
-      return;
+    } else {
+      audio.pause();
     }
-    audio.pause();
-  }, [playerState, setPlayerState]);
+  }, [playerState.isPlaying, setPlayerState, streamUrl]);
 
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = Math.min(Math.max(volume / 100, 0), 1);
-    }
+    if (audioRef.current) audioRef.current.volume = Math.min(Math.max(volume / 100, 0), 1);
   }, [volume]);
 
-  if (!currentTrack) return null;
-
-  const togglePlayPause = () => {
-    if (setPlayerState) {
-      setPlayerState({ ...playerState, isPlaying: !playerState.isPlaying });
+  const handleNext = useCallback(() => {
+    if (!currentTrack || activeQueue.length === 0) return;
+    const currentIndex = activeQueue.findIndex((track) => track.id === currentTrack.id);
+    let next: Track | undefined;
+    if (shuffle) {
+      const choices = activeQueue.filter((track) => track.id !== currentTrack.id);
+      next = choices[Math.floor(Math.random() * choices.length)];
+    } else if (currentIndex >= 0 && currentIndex < activeQueue.length - 1) {
+      next = activeQueue[currentIndex + 1];
+    } else if (repeat === "all") {
+      next = activeQueue[0];
     }
-  };
-
-  const handleVolumeChange = (newVolume: number) => {
-    if (setPlayerState) {
-      setPlayerState({ ...playerState, volume: newVolume });
+    if (!next) {
+      setPlayerState((state) => ({ ...state, isPlaying: false }));
+      setProgress(0);
+      return;
     }
-  };
+    setPlayerState((state) => ({ ...state, currentTrackId: next.id, isPlaying: true }));
+  }, [activeQueue, currentTrack, repeat, setPlayerState, shuffle]);
 
-  const handleSeek = (time: number) => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = time;
+  const handlePrevious = useCallback(() => {
+    if (!currentTrack || activeQueue.length === 0) return;
+    if (progress > 3) {
+      if (audioRef.current) audioRef.current.currentTime = 0;
+      setProgress(0);
+      return;
     }
-    setProgress(time);
-  };
+    const currentIndex = activeQueue.findIndex((track) => track.id === currentTrack.id);
+    const previous = currentIndex > 0
+      ? activeQueue[currentIndex - 1]
+      : repeat === "all" ? activeQueue.at(-1) : undefined;
+    if (previous) setPlayerState((state) => ({ ...state, currentTrackId: previous.id, isPlaying: true }));
+  }, [activeQueue, currentTrack, progress, repeat, setPlayerState]);
+
+  const reportStreamError = useCallback((error: unknown, sessionId: string) => {
+    if (streamSessionRef.current !== sessionId) return;
+    if (error instanceof ApiError && error.status === 403) {
+      audioRef.current?.pause();
+      setPlayerError(error.message);
+      setPlayerState((state) => ({ ...state, isPlaying: false }));
+    }
+  }, [setPlayerState]);
 
   const reportStream = (seconds: number, force = false) => {
     if (!currentTrack || streamRequestPendingRef.current) return;
     const reportedSeconds = Math.max(0, Math.floor(seconds));
     const sessionId = streamSessionRef.current;
-
     if (!streamStartedRef.current) {
       streamStartedRef.current = true;
       streamRequestPendingRef.current = true;
       void musicApi.registerStream(currentTrack.id, sessionId, 0)
-        .catch(() => {
-          if (streamSessionRef.current === sessionId) streamStartedRef.current = false;
+        .catch((error) => {
+          streamStartedRef.current = false;
+          reportStreamError(error, sessionId);
         })
-        .finally(() => {
-          if (streamSessionRef.current === sessionId) streamRequestPendingRef.current = false;
-        });
+        .finally(() => { streamRequestPendingRef.current = false; });
       return;
     }
-
     if (!force && reportedSeconds - lastStreamReportRef.current < 10) return;
     streamRequestPendingRef.current = true;
     void musicApi.registerStream(currentTrack.id, sessionId, reportedSeconds)
-      .then(() => {
-        if (streamSessionRef.current === sessionId) lastStreamReportRef.current = reportedSeconds;
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        if (streamSessionRef.current === sessionId) streamRequestPendingRef.current = false;
-      });
+      .then(() => { lastStreamReportRef.current = reportedSeconds; })
+      .catch((error) => reportStreamError(error, sessionId))
+      .finally(() => { streamRequestPendingRef.current = false; });
   };
 
-  const handleAudioEnded = () => {
-    reportStream(audioRef.current?.currentTime ?? currentTrack.durationSeconds, true);
-    if (repeat === "one" && audioRef.current) {
-      audioRef.current.currentTime = 0;
-      void audioRef.current.play();
-      return;
+  const moveQueueTrack = (trackId: string, offset: -1 | 1) => {
+    const from = activeQueue.findIndex((track) => track.id === trackId);
+    const to = from + offset;
+    if (from < 0 || to < 0 || to >= activeQueue.length) return;
+    const next = [...activeQueue];
+    [next[from], next[to]] = [next[to], next[from]];
+    persistQueue(next);
+  };
+
+  const removeQueueTrack = (trackId: string) => {
+    const index = activeQueue.findIndex((track) => track.id === trackId);
+    if (index < 0) return;
+    const next = activeQueue.filter((track) => track.id !== trackId);
+    persistQueue(next);
+    if (currentTrack?.id === trackId) {
+      const replacement = next[Math.min(index, Math.max(next.length - 1, 0))];
+      setPlayerState((state) => ({
+        ...state,
+        currentTrackId: replacement?.id,
+        isPlaying: Boolean(replacement),
+      }));
     }
-    handleNext();
   };
 
-  const toggleRepeat = () => {
-    if (repeat === "off") setRepeat("all");
-    else if (repeat === "all") setRepeat("one");
-    else setRepeat("off");
-  };
+  const queuePanel = (
+    <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+      {activeQueue.map((track, index) => (
+        <div className={`flex items-center gap-2 rounded-lg p-2 ${track.id === currentTrack?.id ? "bg-brand-secondary/15" : "hover:bg-white/10"}`} key={track.id}>
+          <button className="min-w-0 flex-1 text-left" onClick={() => setPlayerState((state) => ({ ...state, currentTrackId: track.id, isPlaying: true }))} type="button">
+            <p className="truncate text-sm font-bold text-white">{track.title}</p>
+            <p className="truncate text-[10px] text-white/60">{track.artistName ?? "Unknown artist"}</p>
+          </button>
+          <button aria-label="Move up" className="px-1 text-white/60 disabled:opacity-25" disabled={index === 0} onClick={() => moveQueueTrack(track.id, -1)} type="button">↑</button>
+          <button aria-label="Move down" className="px-1 text-white/60 disabled:opacity-25" disabled={index === activeQueue.length - 1} onClick={() => moveQueueTrack(track.id, 1)} type="button">↓</button>
+          <button aria-label="Remove from queue" className="px-1 text-rose-300" onClick={() => removeQueueTrack(track.id)} type="button">×</button>
+        </div>
+      ))}
+      {activeQueue.length === 0 ? <p className="py-2 text-center text-sm italic text-white/40">Queue is empty.</p> : null}
+    </div>
+  );
 
-  const currentIdx = activeQueue.findIndex(t => t.id === currentTrack.id);
-  const upcomingTracks = activeQueue.slice(currentIdx + 1, currentIdx + 6); 
+  if (!currentTrack) return null;
+
+  const togglePlayPause = () => setPlayerState((state) => ({ ...state, isPlaying: !state.isPlaying }));
+  const handleSeek = (time: number) => {
+    if (audioRef.current) audioRef.current.currentTime = time;
+    setProgress(time);
+  };
+  const toggleRepeat = () => setRepeat((value) => value === "off" ? "all" : value === "all" ? "one" : "off");
 
   return (
     <>
       <audio
-        onEnded={handleAudioEnded}
+        onEnded={() => {
+          reportStream(audioRef.current?.currentTime ?? currentTrack.durationSeconds, true);
+          if (repeat === "one" && audioRef.current) {
+            audioRef.current.currentTime = 0;
+            void audioRef.current.play();
+          } else handleNext();
+        }}
+        onError={() => streamUrl && setPlayerError("The protected audio stream could not be loaded.")}
         onPause={(event) => reportStream(event.currentTarget.currentTime, true)}
         onPlay={() => reportStream(0, true)}
         onTimeUpdate={(event) => {
@@ -203,210 +230,46 @@ export function PlayerShell() {
           reportStream(seconds);
         }}
         ref={audioRef}
-        src={currentTrack.audioUrl}
+        src={streamUrl ?? undefined}
       />
-      
-      {/* نوار پایین ثابت */}
-      <footer className="fixed bottom-[70px] md:bottom-0 left-0 right-0 z-40 border-t border-white/5 bg-white/[0.04] px-4 py-3.5 backdrop-blur-xl shadow-[0_-4px_24px_rgba(0,0,0,0.4)] text-white transition-all duration-300">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4 relative">
-          
-          <div className="flex items-center justify-between w-full sm:w-[30%] gap-4">
-            {/* اطلاعات آهنگ */}
-            <div 
-              className="flex min-w-0 flex-1 cursor-pointer"
-              onClick={() => setIsMobileExpanded(true)}
-            >
-              <PlayerTrackSummary track={currentTrack} />
-            </div>
 
-            {/* کنترلرهای ساده مینی‌پلیر موبایل */}
-            <div className="flex items-center gap-2 sm:hidden shrink-0">
-              <button onClick={togglePlayPause} className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#1a0b2e] shadow hover:scale-105 transition-transform">
-                {playerState.isPlaying ? (
-                  <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 16 16"><path d="M2.7 1a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7H2.7zm8 0a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7h-2.6z"/></svg>
-                ) : (
-                  <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 16 16"><path d="M3 1.713a.7.7 0 0 1 .1.05l10.89 6.288a.7.7 0 0 1 0 1.212L4.05 14.894A.7.7 0 0 1 3 14.288V1.713z"/></svg>
-                )}
-              </button>
-              <button onClick={handleNext} className="flex h-9 w-9 items-center justify-center text-white/80 hover:text-white transition-colors">
-                <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 16 16"><path d="M12.7 1a.7.7 0 0 0-.7.7v5.15L2.05 1.106A.7.7 0 0 0 1 1.713v12.575a.7.7 0 0 0 1.05.607L12 9.149V14.3a.7.7 0 0 0 1.4 0V1.7a.7.7 0 0 0-.7-.7z"/></svg>
-              </button>
-            </div>
+      <footer className="fixed bottom-[70px] left-0 right-0 z-40 border-t border-white/5 bg-[#1a0b2e]/95 px-4 py-3 text-white shadow-[0_-4px_24px_rgba(0,0,0,0.4)] backdrop-blur-xl md:bottom-0">
+        {playerError ? <p className="mx-auto mb-2 max-w-7xl rounded-md bg-rose-500/15 px-3 py-1.5 text-xs text-rose-200">{playerError}</p> : null}
+        <div className="relative mx-auto flex w-full max-w-7xl items-center justify-between gap-4">
+          <button className="flex min-w-0 flex-1 text-left sm:w-[30%] sm:flex-none" onClick={() => setIsMobileExpanded(true)} type="button">
+            <PlayerTrackSummary track={currentTrack} />
+          </button>
+          <div className="hidden flex-1 justify-center px-4 sm:flex">
+            <PlayerControlsPlaceholder duration={currentTrack.durationSeconds} isPlaying={playerState.isPlaying} onNext={handleNext} onPlayPause={togglePlayPause} onPrevious={handlePrevious} onRepeatToggle={toggleRepeat} onSeek={handleSeek} onShuffleToggle={() => setShuffle((value) => !value)} progress={progress} repeat={repeat} shuffle={shuffle} />
           </div>
-
-          {/* کنترلرهای دسکتاپ */}
-          <div className="hidden sm:flex flex-1 items-center justify-center gap-4 px-4">
-            <PlayerControlsPlaceholder 
-              duration={currentTrack.durationSeconds}
-              isPlaying={playerState.isPlaying} 
-              onNext={handleNext}
-              onPlayPause={togglePlayPause}
-              onPrevious={handlePrevious}
-              onRepeatToggle={toggleRepeat}
-              onSeek={handleSeek}
-              onShuffleToggle={() => setShuffle(!shuffle)}
-              progress={progress}
-              repeat={repeat}
-              shuffle={shuffle}
-            />
-          </div>
-
-          <div className="hidden w-[30%] items-center justify-end gap-3.5 sm:flex relative">
-            {/* دکمه اختصاصی شیشه‌ای متن آهنگ - فقط در صورت وجود کلمات رندر می‌شود */}
-            {currentTrack.lyrics && (
-              <button 
-                className={`transition-all p-1 rounded-md hover:bg-white/5 ${isLyricsOpen ? 'text-brand-secondary scale-105' : 'text-white/60 hover:text-white'}`}
-                onClick={() => {
-                  setIsLyricsOpen(!isLyricsOpen);
-                  if (isQueueOpen) setIsQueueOpen(false);
-                }}
-                title="Lyrics"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                </svg>
-              </button>
-            )}
-
-            <button 
-              className={`transition-colors p-1 rounded-md hover:bg-white/5 ${isQueueOpen ? 'text-brand-secondary' : 'text-white/60 hover:text-white'}`}
-              onClick={() => {
-                setIsQueueOpen(!isQueueOpen);
-                if (isLyricsOpen) setIsLyricsOpen(false);
-              }}
-            >
-              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 16 16">
-                <path d="M15 15H1v-1.5h14V15zm0-4.5H1V9h14v1.5zm-14-7A2.5 2.5 0 0 1 3.5 1h9a2.5 2.5 0 0 1 0 5h-9A2.5 2.5 0 0 1 1 3.5zm2.5-1a1 1 0 0 0 0 2h9a1 1 0 1 0 0-2h-9z" />
-              </svg>
-            </button>
-            
-            <div className="group flex items-center">
-              <input 
-                className="h-1.5 w-24 cursor-pointer appearance-none rounded-full bg-white/10 accent-white transition-all group-hover:accent-brand-secondary" 
-                max="100" 
-                min="0"
-                onChange={(e) => handleVolumeChange(Number(e.target.value))}
-                type="range"
-                value={volume} 
-              />
-            </div>
-
-            {/* پاپ‌آپ شیشه‌ای نمایش متن آهنگ */}
-            {isLyricsOpen && currentTrack.lyrics && (
-              <div className="absolute bottom-[calc(100%+1.5rem)] right-0 w-80 max-h-[350px] rounded-xl border border-white/10 bg-[#160926]/95 p-4.5 shadow-2xl backdrop-blur-xl text-white flex flex-col gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
-                <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest border-b border-white/5 pb-2">Lyrics</h3>
-                <div className="flex-1 overflow-y-auto pr-1 text-sm leading-relaxed whitespace-pre-line text-white/90 font-medium scrollbar-thin select-none">
-                  {currentTrack.lyrics}
-                </div>
-              </div>
-            )}
-
-            {/* پاپ‌آپ صف پخش */}
-            {isQueueOpen && (
-              <div className="absolute bottom-[calc(100%+1rem)] right-0 w-80 rounded-xl border border-white/10 bg-[#1a0b2e]/95 p-4 shadow-2xl backdrop-blur-xl text-white">
-                <h3 className="mb-4 text-xs font-bold text-white/50 uppercase tracking-wider">Next In Queue</h3>
-                <div className="flex flex-col gap-2">
-                  {upcomingTracks.length > 0 ? upcomingTracks.map(t => {
-                    const tArtist = t.artistName ? { stageName: t.artistName } : null;
-                    return (
-                      <div className="flex items-center gap-3 cursor-pointer hover:bg-white/10 p-2 rounded-lg transition-colors" key={t.id} onClick={() => setPlayerState?.({ ...playerState, currentTrackId: t.id, isPlaying: true })}>
-                        <img alt={t.title} className="h-10 w-10 rounded-md object-cover shadow-sm" src={t.coverImageUrl || ""} />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-bold text-white">{t.title}</p>
-                          <p className="truncate text-[10px] text-white/60 uppercase mt-0.5">{tArtist?.stageName || "Unknown"}</p>
-                        </div>
-                      </div>
-                    );
-                  }) : (
-                    <p className="text-sm text-white/40 italic text-center py-2">No upcoming tracks.</p>
-                  )}
-                </div>
-              </div>
-            )}
+          <div className="flex shrink-0 items-center gap-2 sm:w-[30%] sm:justify-end">
+            <button className="sm:hidden" onClick={togglePlayPause} type="button">{playerState.isPlaying ? "Pause" : "Play"}</button>
+            <button className="sm:hidden" onClick={handleNext} type="button">Next</button>
+            {currentTrack.lyrics ? <button className="hidden text-xs text-white/70 sm:block" onClick={() => { setIsLyricsOpen((value) => !value); setIsQueueOpen(false); }} type="button">Lyrics</button> : null}
+            <button className="hidden text-xs text-white/70 sm:block" onClick={() => { setIsQueueOpen((value) => !value); setIsLyricsOpen(false); }} type="button">Queue</button>
+            <input aria-label="Volume" className="hidden w-24 accent-brand-secondary sm:block" max="100" min="0" onChange={(event) => setPlayerState((state) => ({ ...state, volume: Number(event.target.value) }))} type="range" value={volume} />
+            {isLyricsOpen && currentTrack.lyrics ? <div className="absolute bottom-[calc(100%+1rem)] right-0 max-h-80 w-80 overflow-y-auto rounded-xl border border-white/10 bg-[#160926]/95 p-4 text-sm whitespace-pre-line shadow-2xl">{currentTrack.lyrics}</div> : null}
+            {isQueueOpen ? <div className="absolute bottom-[calc(100%+1rem)] right-0 w-96 max-w-[90vw] rounded-xl border border-white/10 bg-[#160926]/95 p-4 shadow-2xl"><h3 className="mb-3 text-xs font-bold uppercase text-white/50">Playback queue</h3>{queuePanel}</div> : null}
           </div>
         </div>
       </footer>
 
-      {/* پلیر تمام‌صفحه اختصاصی موبایل */}
-      {isMobileExpanded && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-[#160926]/95 p-6 backdrop-blur-3xl sm:hidden text-white overflow-y-auto">
-          <div className="mb-6 flex items-center justify-between shrink-0">
-            <button className="text-white/70 hover:text-white" onClick={() => setIsMobileExpanded(false)}>
-              <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z" />
-              </svg>
-            </button>
-            <span className="text-xs font-bold uppercase tracking-widest text-white/40">Now Playing</span>
-            <div className="w-6 h-6" /> 
-          </div>
-
-          <div className="flex flex-1 flex-col justify-center gap-6 max-w-sm mx-auto w-full pb-8">
-            <div className="aspect-square w-full overflow-hidden rounded-3xl bg-white/5 shadow-2xl border border-white/10 shrink-0">
-              {currentTrack.coverImageUrl ? (
-                <img alt={currentTrack.title} className="h-full w-full object-cover" src={currentTrack.coverImageUrl} />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-white/20">Cover</div>
-              )}
+      {isMobileExpanded ? (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-[#160926]/98 p-6 text-white backdrop-blur-3xl sm:hidden">
+          <div className="mx-auto flex min-h-full max-w-sm flex-col gap-6">
+            <div className="flex items-center justify-between"><button onClick={() => setIsMobileExpanded(false)} type="button">Close</button><span className="text-xs uppercase text-white/50">Now playing</span><span /></div>
+            <div className="aspect-square overflow-hidden rounded-3xl bg-white/5">{currentTrack.coverImageUrl ? <img alt={currentTrack.title} className="h-full w-full object-cover" src={currentTrack.coverImageUrl} /> : null}</div>
+            <div className="text-center">
+              <h2 className="text-2xl font-black">{currentTrack.title}</h2>
+              <p className="mt-2 text-sm text-white/60"><Link href={`/artist/${currentTrack.artistId}`}>{currentTrack.artistName ?? "Unknown artist"}</Link>{currentTrack.albumId ? <> · <Link href={`/music/album/${currentTrack.albumId}`}>{currentTrack.albumTitle ?? "Album"}</Link></> : null}</p>
             </div>
-
-            <div className="text-center shrink-0">
-              <h2 className="truncate text-2xl font-black text-white">{currentTrack.title}</h2>
-              <div className="flex items-center justify-center gap-2 text-sm text-white/60 mt-2">
-                {currentArtist ? (
-                  <Link 
-                    className="truncate hover:text-white hover:underline" 
-                    href={`/artist/${currentTrack.artistId}`}
-                    onClick={() => setIsMobileExpanded(false)}
-                  >
-                    {currentArtist.stageName}
-                  </Link>
-                ) : (
-                  <p className="truncate">Unknown Artist</p>
-                )}
-              </div>
-            </div>
-
-            <div className="w-full flex flex-col gap-5 mt-1 shrink-0">
-              <div className="flex w-full items-center gap-3">
-                <span className="w-10 text-right text-xs text-white/60 font-semibold">{formatDuration(progress)}</span>
-                <input
-                  className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-white/20 accent-white transition-all focus:outline-none"
-                  max={currentTrack.durationSeconds}
-                  min="0"
-                  onChange={(e) => handleSeek(Number(e.target.value))}
-                  type="range"
-                  value={progress}
-                />
-                <span className="w-10 text-left text-xs text-white/60 font-semibold">{formatDuration(currentTrack.durationSeconds)}</span>
-              </div>
-
-              <PlayerControlsPlaceholder 
-                duration={currentTrack.durationSeconds}
-                isPlaying={playerState.isPlaying} 
-                onNext={handleNext}
-                onPlayPause={togglePlayPause}
-                onPrevious={handlePrevious}
-                onRepeatToggle={toggleRepeat}
-                onSeek={handleSeek}
-                onShuffleToggle={() => setShuffle(!shuffle)}
-                progress={progress}
-                repeat={repeat}
-                shuffle={shuffle}
-              />
-            </div>
-
-            {/* پنل شیشه‌ای فشرده و اسکرول‌پذیر لیریکس برای نمای بزرگ گوشی */}
-            {currentTrack.lyrics && (
-              <div className="w-full bg-white/[0.02] border border-white/5 p-4 rounded-2xl max-h-[160px] overflow-y-auto mt-2 shadow-inner">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-white/30 mb-2.5">Lyrics</p>
-                <p className="text-sm leading-relaxed text-white/80 font-medium whitespace-pre-line select-none">
-                  {currentTrack.lyrics}
-                </p>
-              </div>
-            )}
+            <PlayerControlsPlaceholder duration={currentTrack.durationSeconds} isPlaying={playerState.isPlaying} onNext={handleNext} onPlayPause={togglePlayPause} onPrevious={handlePrevious} onRepeatToggle={toggleRepeat} onSeek={handleSeek} onShuffleToggle={() => setShuffle((value) => !value)} progress={progress} repeat={repeat} shuffle={shuffle} />
+            <label className="flex items-center gap-3 text-sm text-white/70">Volume<input className="flex-1 accent-brand-secondary" max="100" min="0" onChange={(event) => setPlayerState((state) => ({ ...state, volume: Number(event.target.value) }))} type="range" value={volume} /></label>
+            <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"><h3 className="mb-3 text-xs font-bold uppercase text-white/50">Playback queue</h3>{queuePanel}</section>
+            {currentTrack.lyrics ? <section className="max-h-48 overflow-y-auto rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm whitespace-pre-line">{currentTrack.lyrics}</section> : null}
           </div>
         </div>
-      )}
+      ) : null}
     </>
   );
 }

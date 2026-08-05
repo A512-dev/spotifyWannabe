@@ -19,6 +19,7 @@ export interface ArtistApplicationApi {
 export interface TicketMessageApi {
   id: string;
   senderId: string;
+  senderName: string;
   body: string;
   isInternalNote: boolean;
   createdAt: string;
@@ -51,6 +52,7 @@ export interface RevenueRecordApi {
   currency: "USD" | "EUR" | "IRR";
   paymentStatus: "pending" | "settled";
   settledAt?: string;
+  trackBreakdown: TrackRevenueBreakdownApi[];
 }
 
 export interface ApprovedArtistApi {
@@ -72,6 +74,9 @@ export interface RevenueGenerationInput {
 export const operationsApi = {
   listApplications(params: { status?: string; search?: string } = {}) {
     return apiRequest<PaginatedResponse<ArtistApplicationApi>>(`/artists/applications/${toQuery(params)}`);
+  },
+  getApplication(id: string) {
+    return apiRequest<ArtistApplicationApi>(`/artists/applications/${id}/`);
   },
   reviewApplication(id: string, decision: "approved" | "rejected", reviewNote: string) {
     return apiRequest<ArtistApplicationApi>(`/artists/applications/${id}/review/`, {
@@ -205,5 +210,17 @@ export interface ArtistOverviewApi {
   pendingPayments: number;
   settledPayments: number;
   currencyBreakdown: CurrencyBreakdownApi[];
+  trackRevenueBreakdown: TrackRevenueBreakdownApi[];
   generatedAt: string;
+}
+
+export interface TrackRevenueBreakdownApi {
+  trackId: string;
+  trackTitle: string;
+  currency?: "USD" | "EUR" | "IRR";
+  streamCount: number;
+  uniqueListeners: number;
+  grossRevenueCents?: number;
+  platformFeeCents?: number;
+  netRevenueCents: number;
 }

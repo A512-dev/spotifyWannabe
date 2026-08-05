@@ -241,6 +241,8 @@ class ArtistProfileSerializer(serializers.ModelSerializer):
     monthlyListeners = serializers.SerializerMethodField()
     trackCount = serializers.SerializerMethodField()
     albumCount = serializers.SerializerMethodField()
+    totalStreams = serializers.SerializerMethodField()
+    isFollowing = serializers.SerializerMethodField()
 
     class Meta:
         model = ArtistProfile
@@ -258,6 +260,8 @@ class ArtistProfileSerializer(serializers.ModelSerializer):
             "monthlyListeners",
             "trackCount",
             "albumCount",
+            "totalStreams",
+            "isFollowing",
         ]
 
     verifiedAt = serializers.DateTimeField(source="verified_at", read_only=True)
@@ -323,3 +327,59 @@ class ArtistProfileSerializer(serializers.ModelSerializer):
 
     def get_albumCount(self, obj: ArtistProfile) -> int:
         return obj.albums.filter(status="published").count()
+
+    def get_totalStreams(self, obj: ArtistProfile) -> int | None:
+        request = self.context.get("request")
+        if request is None or not request.user.is_authenticated:
+            return None
+        from music.models import StreamEvent
+        from operations.models import SubscriptionTier
+        from subscriptions.services import get_current_subscription_tier
+
+        current_profile = getattr(request.user, "artist_profile", None)
+        may_view = (
+            request.user.is_superuser
+            or (current_profile and current_profile.pk == obj.pk)
+            or get_current_subscription_tier(request.user) == SubscriptionTier.GOLD
+        )
+        if not may_view:
+            return None
+        return StreamEvent.objects.filter(track__artist=obj, counted=True).count()
+
+    def get_isFollowing(self, obj: ArtistProfile) -> bool:
+        request = self.context.get("request")
+        if request is None or not request.user.is_authenticated:
+            return False
+        from accounts.models import UserFollow
+
+        return UserFollow.objects.filter(
+            follower=request.user,
+            following_id=obj.user_id,
+        ).exists()
+
+
+class ArtistProfileUpdateSerializer(serializers.ModelSerializer):
+    stageName = serializers.CharField(source="stage_name", max_length=120, required=False)
+    genreTags = MultiValueListField(
+        source="genre_tags",
+        child=serializers.CharField(max_length=80, allow_blank=True),
+        required=False,
+        allow_empty=True,
+    )
+    profileImage = serializers.ImageField(source="profile_image", required=False, allow_null=True)
+    bannerImage = serializers.ImageField(source="banner_image", required=False, allow_null=True)
+
+    class Meta:
+        model = ArtistProfile
+        fields = ["stageName", "bio", "genreTags", "profileImage", "bannerImage"]
+
+    def validate_genreTags(self, values):
+        normalized = []
+        for value in values:
+            cleaned = value.strip()
+            if cleaned and cleaned.casefold() not in {item.casefold() for item in normalized}:
+                normalized.append(cleaned)
+        return normalized[:12]
+
+    def to_representation(self, instance):
+        return ArtistProfileSerializer(instance, context=self.context).data

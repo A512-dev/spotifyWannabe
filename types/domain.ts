@@ -19,6 +19,7 @@ export type NotificationType =
   | "system"
   | "playlist"
   | "artist"
+  | "artist_release"
   | "billing"
   | "support";
 
@@ -42,6 +43,22 @@ export interface User {
   isFollowing?: boolean;
 }
 
+export type PublicUser = Pick<
+  User,
+  | "id"
+  | "username"
+  | "displayName"
+  | "role"
+  | "subscriptionTier"
+  | "avatarUrl"
+  | "artistProfileId"
+  | "createdAt"
+  | "followerCount"
+  | "followingCount"
+  | "dailyStreamCount"
+  | "isFollowing"
+>;
+
 export interface ArtistProfile {
   id: string;
   userId: string;
@@ -64,7 +81,7 @@ export interface Track {
   albumId?: string;
   albumTitle?: string;
   durationSeconds: number;
-  audioUrl: string;
+  audioUrl?: string | null;
   coverImageUrl?: string;
   playCount?: number;
   uniqueListeners?: number;

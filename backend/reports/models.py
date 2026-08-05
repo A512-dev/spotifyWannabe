@@ -58,6 +58,7 @@ class ArtistRevenueRecord(TimestampedModel):
         blank=True,
     )
     calculation_note = models.TextField(blank=True)
+    track_breakdown = models.JSONField(default=list, blank=True)
 
     class Meta:
         ordering = ["-period_start", "artist__stage_name"]

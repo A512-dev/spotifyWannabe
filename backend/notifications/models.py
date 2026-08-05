@@ -10,7 +10,8 @@ from common.models import TimestampedModel
 
 class NotificationType(models.TextChoices):
     SYSTEM = "system", "System"
-    ARTIST = "artist", "Artist"
+    ARTIST = "artist", "Artist account"
+    ARTIST_RELEASE = "artist_release", "Followed artist release"
     BILLING = "billing", "Billing"
     SUPPORT = "support", "Support"
     PLAYLIST = "playlist", "Playlist"
@@ -23,7 +24,7 @@ class Notification(TimestampedModel):
         on_delete=models.CASCADE,
         related_name="notifications",
     )
-    type = models.CharField(max_length=16, choices=NotificationType.choices)
+    type = models.CharField(max_length=24, choices=NotificationType.choices)
     title = models.CharField(max_length=160)
     message = models.TextField()
     action_href = models.CharField(max_length=500, blank=True)

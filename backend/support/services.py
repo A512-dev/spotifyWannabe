@@ -68,7 +68,7 @@ def add_ticket_message(
     is_internal_note: bool,
 ) -> TicketMessage:
     locked_ticket = (
-        Ticket.objects.select_for_update()
+        Ticket.objects.select_for_update(of=("self",))
         .select_related("requester", "assigned_to")
         .get(pk=ticket.pk)
     )

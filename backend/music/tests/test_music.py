@@ -1,5 +1,5 @@
 from datetime import timedelta
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -17,7 +17,7 @@ User = get_user_model()
 
 
 def audio_file(name="track.mp3"):
-    return SimpleUploadedFile(name, b"fake-audio-data", content_type="audio/mpeg")
+    return SimpleUploadedFile(name, b"ID3\x04\x00\x00\x00\x00\x00\x00audio", content_type="audio/mpeg")
 
 
 class MusicApiTests(APITestCase):
@@ -80,15 +80,19 @@ class MusicApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["count"], 1)
 
-    def test_catalog_returns_root_relative_media_url(self):
+    def test_catalog_hides_storage_url_and_playback_returns_signed_url(self):
         track = self.create_track(title="Media URL Track")
         self.client.force_authenticate(user=self.listener)
 
         response = self.client.get(reverse("music:track-list"), {"search": track.title})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        audio_url = response.data["results"][0]["audioUrl"]
-        self.assertEqual(urlparse(audio_url).path, f"/media/{track.audio_file.name}")
+        self.assertIsNone(response.data["results"][0]["audioUrl"])
+        playback = self.client.get(reverse("music:track-playback", args=[track.pk]))
+        self.assertEqual(playback.status_code, status.HTTP_200_OK)
+        parsed = urlparse(playback.data["streamUrl"])
+        self.assertEqual(parsed.path, reverse("music:track-audio-file", args=[track.pk]))
+        self.assertTrue(parse_qs(parsed.query)["token"][0])
 
     def test_basic_user_cannot_see_early_access_track(self):
         self.create_track(title="Early", is_early_access=True, release_date=timezone.localdate() + timedelta(days=2))
@@ -166,27 +170,37 @@ class MusicApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("downloadUrl", response.data)
 
-    def test_artist_can_create_album_and_add_track(self):
+    def test_artist_can_atomically_create_album_with_two_tracks(self):
         self.client.force_authenticate(user=self.artist_user)
-        album_response = self.client.post(reverse("music:album-list"), {
+        album_response = self.client.post(reverse("music:album-create-release"), {
             "title": "Album",
             "releaseDate": str(timezone.localdate()),
             "status": "published",
             "isEarlyAccess": False,
+            "explicit": False,
+            "trackTitles": ["First", "Second"],
+            "trackFiles": [audio_file("first.mp3"), audio_file("second.mp3")],
+            "trackDurations": [180, 190],
+            "trackLyrics": ["", ""],
         }, format="multipart")
         self.assertEqual(album_response.status_code, status.HTTP_201_CREATED)
         album_id = album_response.data["id"]
-        track_response = self.client.post(reverse("music:track-list"), {
-            "title": "Album Track",
-            "audioFile": audio_file("album.mp3"),
-            "durationSeconds": 180,
-            "releaseDate": str(timezone.localdate()),
-            "status": "published",
-            "albumId": album_id,
-            "trackNumber": 1,
-        }, format="multipart")
-        self.assertEqual(track_response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(str(Track.objects.get(title="Album Track").album_id), album_id)
+        self.assertEqual(Track.objects.filter(album_id=album_id).count(), 2)
+
+    def test_basic_playback_is_denied_after_sixty_counted_streams(self):
+        track = self.create_track(title="Daily limit")
+        for index in range(60):
+            StreamEvent.objects.create(
+                track=track,
+                listener=self.listener,
+                session_id=f"daily-{index}",
+                listened_seconds=31,
+                counted=True,
+                streamed_on=timezone.localdate(),
+            )
+        self.client.force_authenticate(user=self.listener)
+        response = self.client.get(reverse("music:track-playback", args=[track.pk]))
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
     def test_counted_session_cannot_be_downgraded(self):

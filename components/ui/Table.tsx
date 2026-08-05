@@ -20,8 +20,8 @@ export function Table<T>({
   rows
 }: TableProps<T>) {
   return (
-    <div className="overflow-hidden rounded-lg border border-surface-600">
-      <table className="w-full border-collapse text-left text-sm">
+    <div className="overflow-x-auto rounded-lg border border-surface-600">
+      <table className="min-w-max w-full border-collapse text-left text-sm">
         <thead className="bg-surface-700 text-xs uppercase tracking-wide text-slate-400">
           <tr>
             {columns.map((column) => (
@@ -54,4 +54,3 @@ export function Table<T>({
     </div>
   );
 }
-

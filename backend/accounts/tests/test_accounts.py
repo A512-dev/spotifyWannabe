@@ -12,6 +12,7 @@ from rest_framework.test import APITestCase
 
 from accounts.models import UserFollow
 from artists.models import ArtistApplication
+from support.models import Ticket, TicketMessage
 
 User = get_user_model()
 
@@ -62,9 +63,25 @@ class AccountsApiTests(APITestCase):
         update = self.client.patch(reverse("accounts:me"), {"displayName": "Updated"}, format="json")
         self.assertEqual(update.status_code, status.HTTP_200_OK)
         self.assertEqual(update.data["displayName"], "Updated")
+        ticket = Ticket.objects.create(requester=user, subject="Keep audit history")
+        message = TicketMessage.objects.create(ticket=ticket, sender=user, body="Private message")
         delete = self.client.delete(reverse("accounts:me"))
         self.assertEqual(delete.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(User.objects.filter(pk=user.pk).exists())
+        user.refresh_from_db()
+        self.assertFalse(user.is_active)
+        self.assertTrue(user.email.endswith("@invalid.local"))
+        self.assertTrue(TicketMessage.objects.filter(pk=message.pk, sender=user).exists())
+
+    def test_public_user_endpoint_does_not_expose_private_fields(self):
+        viewer = User.objects.create_user(username="viewer", email="viewer@example.com")
+        target = User.objects.create_user(username="target", email="private@example.com")
+        target.profile.birth_date = date(2000, 1, 1)
+        target.profile.save()
+        self.client.force_authenticate(user=viewer)
+        response = self.client.get(reverse("accounts:user-detail", args=[target.pk]))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        for field in ["email", "birthDate", "gender", "lastActiveAt", "isEmailVerified"]:
+            self.assertNotIn(field, response.data)
 
     def test_artist_registration_creates_pending_application(self):
         payload = {

@@ -13,7 +13,7 @@ def notification_allowed(*, recipient, type: str) -> bool:
         return False
     if type == NotificationType.BILLING:
         return preferences.subscription_notifications
-    if type == NotificationType.ARTIST:
+    if type == NotificationType.ARTIST_RELEASE:
         return preferences.followed_artist_notifications
     if type == NotificationType.SUPPORT:
         return preferences.support_notifications
