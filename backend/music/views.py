@@ -70,8 +70,21 @@ class AlbumViewSet(viewsets.ModelViewSet):
         if search:
             queryset = queryset.filter(Q(title__icontains=search) | Q(artist__stage_name__icontains=search))
         ordering = self.request.query_params.get("ordering", "-release_date")
-        if ordering in {"release_date", "-release_date", "title", "-title", "listener_count", "-listener_count"}:
-            queryset = queryset.order_by(ordering)
+        if ordering in {
+            "release_date",
+            "-release_date",
+            "title",
+            "-title",
+            "listener_count",
+            "-listener_count",
+        }:
+            if ordering in {"release_date", "-release_date"}:
+                created_ordering = (
+                    "created_at" if ordering == "release_date" else "-created_at"
+                )
+                queryset = queryset.order_by(ordering, created_ordering)
+            else:
+                queryset = queryset.order_by(ordering)
         return queryset
 
     def get_serializer_class(self):
@@ -123,8 +136,21 @@ class TrackViewSet(viewsets.ModelViewSet):
         if genre:
             queryset = queryset.filter(genre__slug=genre)
         ordering = self.request.query_params.get("ordering", "-release_date")
-        if ordering in {"release_date", "-release_date", "play_count", "-play_count", "title", "-title"}:
-            queryset = queryset.order_by(ordering)
+        if ordering in {
+            "release_date",
+            "-release_date",
+            "play_count",
+            "-play_count",
+            "title",
+            "-title",
+        }:
+            if ordering in {"release_date", "-release_date"}:
+                created_ordering = (
+                    "created_at" if ordering == "release_date" else "-created_at"
+                )
+                queryset = queryset.order_by(ordering, created_ordering)
+            else:
+                queryset = queryset.order_by(ordering)
         return queryset
 
     def get_serializer_class(self):

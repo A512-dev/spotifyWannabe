@@ -80,6 +80,58 @@ class MusicApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["count"], 1)
 
+    def test_newest_release_order_uses_creation_time_for_equal_dates(self):
+        older_track = self.create_track(title="Older Track")
+        newer_track = self.create_track(title="Newer Track")
+
+        older_album = Album.objects.create(
+            artist=self.artist,
+            title="Older Album",
+            release_date=timezone.localdate(),
+            status="published",
+        )
+        newer_album = Album.objects.create(
+            artist=self.artist,
+            title="Newer Album",
+            release_date=timezone.localdate(),
+            status="published",
+        )
+
+        timestamp = timezone.now()
+
+        Track.objects.filter(pk=older_track.pk).update(
+            created_at=timestamp - timedelta(minutes=1)
+        )
+        Track.objects.filter(pk=newer_track.pk).update(
+            created_at=timestamp
+        )
+        Album.objects.filter(pk=older_album.pk).update(
+            created_at=timestamp - timedelta(minutes=1)
+        )
+        Album.objects.filter(pk=newer_album.pk).update(
+            created_at=timestamp
+        )
+
+        self.client.force_authenticate(user=self.listener)
+
+        tracks = self.client.get(
+            reverse("music:track-list"),
+            {"ordering": "-release_date"},
+        )
+        albums = self.client.get(
+            reverse("music:album-list"),
+            {"ordering": "-release_date"},
+        )
+
+        self.assertEqual(
+            [item["title"] for item in tracks.data["results"][:2]],
+            ["Newer Track", "Older Track"],
+        )
+        self.assertEqual(
+            [item["title"] for item in albums.data["results"][:2]],
+            ["Newer Album", "Older Album"],
+        )
+
     def test_catalog_hides_storage_url_and_playback_returns_signed_url(self):
         track = self.create_track(title="Media URL Track")
         self.client.force_authenticate(user=self.listener)

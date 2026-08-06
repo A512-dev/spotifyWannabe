@@ -205,6 +205,7 @@ export default function ArtistDashboardPage() {
         formData.set("title", draft.title.trim());
         formData.set("audioFile", draft.singleFile as File);
         formData.set("durationSeconds", String(draft.singleDuration));
+        formData.set("trackNumber", "1");
         formData.set("lyrics", draft.lyrics.trim());
         appendCommonTrackFields(formData, draft);
         await artistCatalogApi.createTrack(formData);
