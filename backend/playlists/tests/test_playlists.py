@@ -77,9 +77,25 @@ class PlaylistApiTests(APITestCase):
 
     def test_basic_playlist_limit_is_enforced(self):
         for index in range(6):
-            Playlist.objects.create(owner=self.user, title=f"P{index}")
-        response = self.client.post(reverse("playlists:playlist-list"), {"title": "Seventh"}, format="json")
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+            Playlist.objects.create(
+                owner=self.user,
+                title=f"P{index}",
+            )
+
+        response = self.client.post(
+            reverse("playlists:playlist-list"),
+            {"title": "Seventh"},
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+        self.assertEqual(
+            response.data["error"]["message"],
+            "The Basic plan allows at most 6 playlists.",
+        )
 
     def test_gold_playlist_limit_is_unlimited(self):
         gold = SubscriptionPlan.objects.get(tier="gold")

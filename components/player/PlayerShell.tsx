@@ -79,16 +79,41 @@ export function PlayerShell() {
 
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio || !streamUrl) return;
+    if (!audio) return;
     audio.load();
+  }, [streamUrl]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !streamUrl) return;
+
+    let cancelled = false;
+
     if (playerState.isPlaying) {
-      void audio.play().catch(() => {
-        setPlayerError("Playback could not start. Try selecting the track again.");
-        setPlayerState((state) => ({ ...state, isPlaying: false }));
-      });
+      void audio.play()
+        .then(() => {
+          if (!cancelled) setPlayerError("");
+        })
+        .catch((error: unknown) => {
+          if (
+            cancelled ||
+            (error instanceof DOMException && error.name === "AbortError")
+          ) {
+            return;
+          }
+
+          setPlayerError(
+            "Playback could not start. Try selecting the track again."
+          );
+          setPlayerState((state) => ({ ...state, isPlaying: false }));
+        });
     } else {
       audio.pause();
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, [playerState.isPlaying, setPlayerState, streamUrl]);
 
   useEffect(() => {

@@ -87,14 +87,15 @@ export function TrackCard({ artistName, contextQueue, onSelect, track }: TrackCa
       anchor.download = track.title;
       anchor.rel = "noopener";
       anchor.click();
+      setMenuOpen(false);
     } catch (error) {
       setMenuMessage(error instanceof ApiError ? error.message : "The track could not be downloaded.");
     }
   };
 
   return (
-    <div className="relative w-full cursor-pointer focus:outline-none" onClick={handleCardClick} onKeyDown={handleKeyDown} role="button" tabIndex={0}>
-      <div className="group flex w-full items-center gap-4 rounded-xl border border-white/5 bg-white/[0.02] p-3 transition-all hover:border-brand-secondary/20 hover:bg-white/[0.06] hover:shadow-md">
+    <div className="relative min-w-0 w-full cursor-pointer focus:outline-none" onClick={handleCardClick} onKeyDown={handleKeyDown} role="button" tabIndex={0}>
+      <div className="group flex min-w-0 w-full items-center gap-4 rounded-xl border border-white/5 bg-white/[0.02] p-3 transition-all hover:border-brand-secondary/20 hover:bg-white/[0.06] hover:shadow-md">
         {track.coverImageUrl ? <img alt={`${track.title} cover`} className="h-12 w-12 shrink-0 rounded-md object-cover shadow" src={track.coverImageUrl} /> : <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-brand-primary/20 text-xs text-white/40">Cover</div>}
         <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <div className="min-w-0">
@@ -114,7 +115,7 @@ export function TrackCard({ artistName, contextQueue, onSelect, track }: TrackCa
       </div>
 
       {menuOpen ? (
-        <div className="absolute right-2 top-[calc(100%+0.25rem)] z-30 w-72 cursor-default rounded-xl border border-white/10 bg-[#160926]/98 p-3 shadow-2xl" onClick={stop} role="menu">
+        <div className="absolute bottom-[calc(100%+0.25rem)] right-2 z-50 w-72 cursor-default rounded-xl border border-white/10 bg-[#160926]/98 p-3 shadow-2xl" onClick={stop} role="menu">
           <p className="mb-2 text-xs font-bold uppercase tracking-wide text-white/50">Manage playlists</p>
           {loadingPlaylists ? <p className="text-sm text-white/60">Loading playlists...</p> : null}
           <div className="max-h-48 space-y-1 overflow-y-auto">

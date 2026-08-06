@@ -16,17 +16,29 @@ export function Modal({ children, onClose, open, title }: ModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
-      <section className="w-full max-w-lg rounded-lg border border-surface-600 bg-surface-800 p-5 shadow-2xl">
-        <div className="flex items-start justify-between gap-4">
+    <div
+      aria-modal="true"
+      className="fixed inset-0 z-50 overflow-y-auto bg-black/70 p-4"
+      role="dialog"
+    >
+      <section className="mx-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-surface-600 bg-surface-800 p-5 shadow-2xl">
+        <div className="flex shrink-0 items-start justify-between gap-4">
           <h2 className="text-lg font-semibold text-slate-50">{title}</h2>
-          <Button aria-label="Close modal" onClick={onClose} size="sm" variant="ghost">
+
+          <Button
+            aria-label="Close modal"
+            onClick={onClose}
+            size="sm"
+            variant="ghost"
+          >
             Close
           </Button>
         </div>
-        <div className="mt-4">{children}</div>
+
+        <div className="mt-4 min-h-0 overflow-y-auto pr-1">
+          {children}
+        </div>
       </section>
     </div>
   );
 }
-
