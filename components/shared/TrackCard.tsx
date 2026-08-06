@@ -87,6 +87,7 @@ export function TrackCard({ artistName, contextQueue, onSelect, track }: TrackCa
       anchor.download = track.title;
       anchor.rel = "noopener";
       anchor.click();
+      setMenuOpen(false);
     } catch (error) {
       setMenuMessage(error instanceof ApiError ? error.message : "The track could not be downloaded.");
     }
@@ -114,7 +115,7 @@ export function TrackCard({ artistName, contextQueue, onSelect, track }: TrackCa
       </div>
 
       {menuOpen ? (
-        <div className="absolute right-2 top-[calc(100%+0.25rem)] z-30 w-72 cursor-default rounded-xl border border-white/10 bg-[#160926]/98 p-3 shadow-2xl" onClick={stop} role="menu">
+        <div className="absolute bottom-[calc(100%+0.25rem)] right-2 z-50 w-72 cursor-default rounded-xl border border-white/10 bg-[#160926]/98 p-3 shadow-2xl" onClick={stop} role="menu">
           <p className="mb-2 text-xs font-bold uppercase tracking-wide text-white/50">Manage playlists</p>
           {loadingPlaylists ? <p className="text-sm text-white/60">Loading playlists...</p> : null}
           <div className="max-h-48 space-y-1 overflow-y-auto">

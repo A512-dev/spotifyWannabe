@@ -135,7 +135,7 @@ export default function PlaylistsPage() {
                     <Button onClick={() => void removePlaylist(playlist.id)} size="sm" variant="danger">Delete</Button>
                   </div>
                 </div>
-                <div className="mt-4 grid gap-2">
+                <div className="mt-4 grid max-h-[30rem] gap-2 overflow-y-auto overscroll-contain pr-2">
                   {tracks.length ? tracks.map((track) => (
                     <div className="min-w-0" key={track.id}>
                       <TrackCard artistName={track.artistName} contextQueue={queue} track={track} />
