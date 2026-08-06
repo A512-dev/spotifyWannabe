@@ -120,12 +120,12 @@ export default function PlaylistsPage() {
       {!loading && playlists.length === 0 ? (
         <div className="mt-8"><EmptyState action={<Button onClick={openCreate}>Create first playlist</Button>} description="Create your first playlist and add tracks from the music catalog." title="No playlists" /></div>
       ) : (
-        <section className="mt-8 flex gap-6 overflow-x-auto pb-6">
+        <section className="mt-8 grid min-w-0 gap-6 pb-6 lg:grid-cols-2 xl:grid-cols-3">
           {playlists.map((playlist) => {
             const tracks = playlist.items?.map((item) => item.track) ?? [];
             const queue = tracks.map((track) => track.id);
             return (
-              <div className="w-[340px] shrink-0 rounded-xl border border-white/5 bg-white/[0.02] p-4" key={playlist.id}>
+              <div className="min-w-0 rounded-xl border border-white/5 bg-white/[0.02] p-4" key={playlist.id}>
                 <PlaylistCard playlist={playlist} />
                 <div className="mt-3 flex flex-wrap justify-between gap-2 border-t border-white/5 pt-3">
                   <Button disabled={!tracks.length} onClick={() => void playPlaylist(playlist)} size="sm">Play</Button>
@@ -137,7 +137,7 @@ export default function PlaylistsPage() {
                 </div>
                 <div className="mt-4 grid gap-2">
                   {tracks.length ? tracks.map((track) => (
-                    <div key={track.id}>
+                    <div className="min-w-0" key={track.id}>
                       <TrackCard artistName={track.artistName} contextQueue={queue} track={track} />
                       <button className="mt-1 text-xs text-red-300" onClick={() => void removeTrack(playlist.id, track.id)} type="button">Remove</button>
                     </div>

@@ -93,8 +93,8 @@ export function TrackCard({ artistName, contextQueue, onSelect, track }: TrackCa
   };
 
   return (
-    <div className="relative w-full cursor-pointer focus:outline-none" onClick={handleCardClick} onKeyDown={handleKeyDown} role="button" tabIndex={0}>
-      <div className="group flex w-full items-center gap-4 rounded-xl border border-white/5 bg-white/[0.02] p-3 transition-all hover:border-brand-secondary/20 hover:bg-white/[0.06] hover:shadow-md">
+    <div className="relative min-w-0 w-full cursor-pointer focus:outline-none" onClick={handleCardClick} onKeyDown={handleKeyDown} role="button" tabIndex={0}>
+      <div className="group flex min-w-0 w-full items-center gap-4 rounded-xl border border-white/5 bg-white/[0.02] p-3 transition-all hover:border-brand-secondary/20 hover:bg-white/[0.06] hover:shadow-md">
         {track.coverImageUrl ? <img alt={`${track.title} cover`} className="h-12 w-12 shrink-0 rounded-md object-cover shadow" src={track.coverImageUrl} /> : <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-brand-primary/20 text-xs text-white/40">Cover</div>}
         <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <div className="min-w-0">

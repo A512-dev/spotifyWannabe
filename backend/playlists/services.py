@@ -16,8 +16,20 @@ def ensure_playlist_owner(*, user, playlist: Playlist) -> None:
 
 def enforce_playlist_limit(*, user) -> None:
     plan = current_plan_for(user)
-    if plan.playlist_limit is not None and Playlist.objects.filter(owner=user).count() >= plan.playlist_limit:
-        raise ValidationError({"playlist": f"The {plan.tier} plan allows at most {plan.playlist_limit} playlists."})
+
+    if (
+        plan.playlist_limit is not None
+        and Playlist.objects.filter(owner=user).count()
+        >= plan.playlist_limit
+    ):
+        raise ValidationError(
+            {
+                "playlist": (
+                    f"The {plan.get_tier_display()} plan allows at most "
+                    f"{plan.playlist_limit} playlists."
+                )
+            }
+        )
 
 
 @transaction.atomic
