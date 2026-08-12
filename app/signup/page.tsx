@@ -50,7 +50,7 @@ export default function SignupPage() {
     });
     setSubmitting(false);
     if (!result.ok) {
-      setListenerError(result.error ?? t("Could not create the account."));
+      setListenerError(t(result.error ?? "Could not create the account."));
       return;
     }
     router.push("/");
@@ -90,7 +90,7 @@ export default function SignupPage() {
     });
     setSubmitting(false);
     if (!result.ok || !result.data) {
-      setArtistError(result.error ?? t("Could not submit the artist application."));
+      setArtistError(t(result.error ?? "Could not submit the artist application."));
       return;
     }
     form.reset();

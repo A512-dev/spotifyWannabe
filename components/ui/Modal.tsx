@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
+import { useUserPreferences } from "@/providers/UserPreferencesProvider";
 
 interface ModalProps {
   open: boolean;
@@ -11,6 +12,7 @@ interface ModalProps {
 }
 
 export function Modal({ children, onClose, open, title }: ModalProps) {
+  const { t } = useUserPreferences();
   if (!open) {
     return null;
   }
@@ -26,12 +28,12 @@ export function Modal({ children, onClose, open, title }: ModalProps) {
           <h2 className="text-lg font-semibold text-slate-50">{title}</h2>
 
           <Button
-            aria-label="Close modal"
+            aria-label={t("Close modal")}
             onClick={onClose}
             size="sm"
             variant="ghost"
           >
-            Close
+            {t("Close")}
           </Button>
         </div>
 

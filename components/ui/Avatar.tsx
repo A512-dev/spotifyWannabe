@@ -1,4 +1,7 @@
+"use client";
+
 import { cn } from "@/lib/utils";
+import { useUserPreferences } from "@/providers/UserPreferencesProvider";
 
 interface AvatarProps {
   name: string;
@@ -7,6 +10,7 @@ interface AvatarProps {
 }
 
 export function Avatar({ className, name, src }: AvatarProps) {
+  const { t } = useUserPreferences();
   const initials = name
     .split(" ")
     .map((part) => part[0])
@@ -17,7 +21,7 @@ export function Avatar({ className, name, src }: AvatarProps) {
   if (src) {
     return (
       <img
-        alt={`${name} avatar`}
+        alt={t("{name} avatar", { name })}
         className={cn("h-10 w-10 rounded-full border border-surface-600 object-cover", className)}
         src={src}
       />

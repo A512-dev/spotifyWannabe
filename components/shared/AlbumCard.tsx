@@ -27,7 +27,7 @@ export function AlbumCard({ album, artistName }: AlbumCardProps) {
     >
       {album.coverImageUrl ? (
         <img
-          alt={`${album.title} cover`}
+          alt={t("{title} cover", { title: album.title })}
           className="aspect-square w-full rounded-md object-cover shadow-md transition-transform duration-300 group-hover:scale-[1.02]"
           src={album.coverImageUrl}
         />

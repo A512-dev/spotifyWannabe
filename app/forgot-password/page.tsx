@@ -22,7 +22,7 @@ export default function ForgotPasswordPage() {
     const result = await requestPasswordReset(email);
     setLoading(false);
     if (!result.ok) {
-      setError(result.error ?? t("Could not request a password reset."));
+      setError(t(result.error ?? "Could not request a password reset."));
       return;
     }
     setMessage(t("If the account exists, reset instructions were sent."));

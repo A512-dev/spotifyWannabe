@@ -2,7 +2,7 @@ export type Language = "en" | "fa";
 
 export const LANGUAGE_STORAGE_KEY = "soundwave-language";
 
-const persianLabels: Record<string, string> = {
+export const PERSIAN_LABELS: Record<string, string> = {
   Home: "خانه",
   Music: "موسیقی",
   Playlists: "فهرست‌های پخش",
@@ -445,6 +445,13 @@ const persianLabels: Record<string, string> = {
   "Could not read the audio duration.": "خواندن مدت فایل صوتی ممکن نشد.",
   "Switch to Persian": "تغییر زبان به فارسی",
   "Switch to English": "تغییر زبان به انگلیسی",
+  "{title} cover": "جلد {title}",
+  "{name} avatar": "تصویر نمایهٔ {name}",
+  "{name} banner": "تصویر سربرگ {name}",
+  "The request could not be completed.": "انجام درخواست ممکن نشد.",
+  "Subscription distribution": "توزیع اشتراک",
+  Track: "قطعه",
+  "Close modal": "بستن پنجره",
 };
 
 export function localeForLanguage(language: Language) {
@@ -452,7 +459,7 @@ export function localeForLanguage(language: Language) {
 }
 
 export function translate(language: Language, label: string, values?: Record<string, string | number>) {
-  const template = language === "fa" ? (persianLabels[label] ?? label) : label;
+  const template = language === "fa" ? (PERSIAN_LABELS[label] ?? label) : label;
   if (!values) return template;
   return Object.entries(values).reduce(
     (result, [key, value]) => result.replaceAll(`{${key}}`, String(value)),

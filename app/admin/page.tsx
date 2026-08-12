@@ -79,11 +79,11 @@ export default function AdminPage() {
       setSilverPrice(String(planData.find((plan) => plan.tier === "silver")?.monthlyPriceCents ?? ""));
       setGoldPrice(String(planData.find((plan) => plan.tier === "gold")?.monthlyPriceCents ?? ""));
     } catch (error) {
-      setNotice(errorMessage(error));
+      setNotice(t(errorMessage(error)));
     } finally {
       setLoading(false);
     }
-  }, [currentUser?.role]);
+  }, [currentUser?.role, t]);
 
   useEffect(() => {
     void loadData();
@@ -105,7 +105,7 @@ export default function AdminPage() {
       setNotice(t("Subscription prices were updated for the whole system."));
       await loadData();
     } catch (error) {
-      setNotice(errorMessage(error));
+      setNotice(t(errorMessage(error)));
     } finally {
       setBusy(false);
     }
@@ -120,7 +120,7 @@ export default function AdminPage() {
       setSelectedRecord(null);
       await loadData();
     } catch (error) {
-      setNotice(errorMessage(error));
+      setNotice(t(errorMessage(error)));
     } finally {
       setBusy(false);
     }
@@ -146,7 +146,7 @@ export default function AdminPage() {
       setNotice(t("The monthly accounting record was generated from verified stream events."));
       await loadData();
     } catch (error) {
-      setNotice(errorMessage(error));
+      setNotice(t(errorMessage(error)));
     } finally {
       setBusy(false);
     }

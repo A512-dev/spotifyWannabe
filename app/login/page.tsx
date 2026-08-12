@@ -31,7 +31,7 @@ function LoginForm() {
     setIsSubmitting(true);
     const result = await login(email, password);
     if (!result.ok || !result.data) {
-      setError(result.error ?? t("Email or password is incorrect."));
+      setError(t(result.error ?? "Email or password is incorrect."));
       setIsSubmitting(false);
       return;
     }

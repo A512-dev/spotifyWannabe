@@ -156,11 +156,11 @@ export default function ArtistDashboardPage() {
       setOverview(overviewData);
       setRevenue(revenueData.results.filter((record) => record.artistId === artistProfileId));
     } catch (error) {
-      setNotice(errorMessage(error));
+      setNotice(t(errorMessage(error)));
     } finally {
       setLoading(false);
     }
-  }, [artistProfileId]);
+  }, [artistProfileId, t]);
 
   useEffect(() => {
     void loadData();
@@ -172,7 +172,7 @@ export default function ArtistDashboardPage() {
       const duration = await readAudioDuration(file);
       setDraft((value) => ({ ...value, singleFile: file, singleDuration: duration, title: value.title || file.name.replace(/\.[^.]+$/, "") }));
     } catch (error) {
-      setNotice(errorMessage(error));
+      setNotice(t(errorMessage(error)));
     }
   };
 
@@ -188,7 +188,7 @@ export default function ArtistDashboardPage() {
         albumTracks: value.albumTracks.map((track) => track.id === id ? { ...track, file, durationSeconds: duration, title: track.title || file.name.replace(/\.[^.]+$/, "") } : track)
       }));
     } catch (error) {
-      setNotice(errorMessage(error));
+      setNotice(t(errorMessage(error)));
     }
   };
 
@@ -232,7 +232,7 @@ export default function ArtistDashboardPage() {
       setNotice(t("Release saved successfully."));
       await loadData();
     } catch (error) {
-      setNotice(errorMessage(error));
+      setNotice(t(errorMessage(error)));
     } finally {
       setBusy(false);
     }
@@ -247,7 +247,7 @@ export default function ArtistDashboardPage() {
       setNotice(t("Release deleted."));
       await loadData();
     } catch (error) {
-      setNotice(errorMessage(error));
+      setNotice(t(errorMessage(error)));
     } finally {
       setBusy(false);
     }
@@ -294,7 +294,7 @@ export default function ArtistDashboardPage() {
       setNotice(t("Release updated."));
       await loadData();
     } catch (error) {
-      setNotice(errorMessage(error));
+      setNotice(t(errorMessage(error)));
     } finally {
       setBusy(false);
     }
@@ -317,7 +317,7 @@ export default function ArtistDashboardPage() {
       setProfileBanner(null);
       setNotice(t("Artist profile updated."));
     } catch (error) {
-      setNotice(errorMessage(error));
+      setNotice(t(errorMessage(error)));
     } finally {
       setBusy(false);
     }
@@ -441,7 +441,7 @@ export default function ArtistDashboardPage() {
         ]} />
       </section>
       <Modal onClose={() => setEditing(null)} open={Boolean(editing)} title={t("Edit release")}>
-        {editing ? <div className="grid gap-4 md:grid-cols-2"><Input label={t("Title")} onChange={(event) => setEditTitle(event.target.value)} value={editTitle} /><Select label={t("Status")} onChange={(event) => setEditStatus(event.target.value as ReleaseStatus)} options={[{ value: "draft", label: t("Draft") }, { value: "published", label: t("Published") }]} value={editStatus} /><Input label={t("Release date")} onChange={(event) => setEditReleaseDate(event.target.value)} type="date" value={editReleaseDate} /><Select label={t("Genre")} onChange={(event) => setEditGenreId(event.target.value)} options={[{ value: "", label: t("No genre") }, ...genres.map((genre) => ({ value: String(genre.id), label: genre.name }))]} value={editGenreId} /><Input accept="image/*" label={t("Replacement cover")} onChange={(event) => setEditCover(event.target.files?.[0] ?? null)} type="file" /><label className="flex items-center gap-2 text-sm text-slate-200"><input checked={editEarlyAccess} onChange={(event) => setEditEarlyAccess(event.target.checked)} type="checkbox" /> {t("Gold early access")}</label>{editing.kind === "track" ? <><Input accept="audio/*" label={t("Replacement audio")} onChange={(event) => { const file = event.target.files?.[0] ?? null; setEditAudio(file); if (file) void readAudioDuration(file).then(setEditDuration).catch((error) => setNotice(errorMessage(error))); }} type="file" /><Input helperText={t("Comma-separated artist profile IDs")} label={t("Collaborators")} onChange={(event) => setEditCollaborators(event.target.value)} value={editCollaborators} /><label className="flex items-center gap-2 text-sm text-slate-200"><input checked={editExplicit} onChange={(event) => setEditExplicit(event.target.checked)} type="checkbox" /> {t("Explicit content")}</label><Textarea className="md:col-span-2" label={t("Lyrics")} onChange={(event) => setEditLyrics(event.target.value)} rows={6} value={editLyrics} /></> : null}<div className="md:col-span-2"><Button disabled={busy} onClick={() => void saveEdit()}>{t("Save changes")}</Button></div></div> : null}
+        {editing ? <div className="grid gap-4 md:grid-cols-2"><Input label={t("Title")} onChange={(event) => setEditTitle(event.target.value)} value={editTitle} /><Select label={t("Status")} onChange={(event) => setEditStatus(event.target.value as ReleaseStatus)} options={[{ value: "draft", label: t("Draft") }, { value: "published", label: t("Published") }]} value={editStatus} /><Input label={t("Release date")} onChange={(event) => setEditReleaseDate(event.target.value)} type="date" value={editReleaseDate} /><Select label={t("Genre")} onChange={(event) => setEditGenreId(event.target.value)} options={[{ value: "", label: t("No genre") }, ...genres.map((genre) => ({ value: String(genre.id), label: genre.name }))]} value={editGenreId} /><Input accept="image/*" label={t("Replacement cover")} onChange={(event) => setEditCover(event.target.files?.[0] ?? null)} type="file" /><label className="flex items-center gap-2 text-sm text-slate-200"><input checked={editEarlyAccess} onChange={(event) => setEditEarlyAccess(event.target.checked)} type="checkbox" /> {t("Gold early access")}</label>{editing.kind === "track" ? <><Input accept="audio/*" label={t("Replacement audio")} onChange={(event) => { const file = event.target.files?.[0] ?? null; setEditAudio(file); if (file) void readAudioDuration(file).then(setEditDuration).catch((error) => setNotice(t(errorMessage(error)))); }} type="file" /><Input helperText={t("Comma-separated artist profile IDs")} label={t("Collaborators")} onChange={(event) => setEditCollaborators(event.target.value)} value={editCollaborators} /><label className="flex items-center gap-2 text-sm text-slate-200"><input checked={editExplicit} onChange={(event) => setEditExplicit(event.target.checked)} type="checkbox" /> {t("Explicit content")}</label><Textarea className="md:col-span-2" label={t("Lyrics")} onChange={(event) => setEditLyrics(event.target.value)} rows={6} value={editLyrics} /></> : null}<div className="md:col-span-2"><Button disabled={busy} onClick={() => void saveEdit()}>{t("Save changes")}</Button></div></div> : null}
       </Modal>
     </DashboardLayout>
   );

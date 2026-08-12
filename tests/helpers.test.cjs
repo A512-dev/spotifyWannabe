@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
+const ts = require("typescript");
 
 const { mockCredentials } = require("@/data/auth-credentials");
 const { artists } = require("@/data/artists");
@@ -10,7 +11,7 @@ const { tracks } = require("@/data/tracks");
 const { users } = require("@/data/users");
 const { authenticateUser, getPostLoginPath, normalizeEmail } = require("@/lib/auth");
 const { formatCurrencyFromCents, formatDuration, formatNumber } = require("@/lib/formatters");
-const { localeForLanguage, translate } = require("@/lib/i18n");
+const { localeForLanguage, PERSIAN_LABELS, translate } = require("@/lib/i18n");
 const { canAccessRoute, filterNavigationForUser } = require("@/lib/permissions");
 const {
   canAccessAdvancedStats,
@@ -77,7 +78,70 @@ test("formats currency from cents", () => {
 test("translates Persian labels without corrupting UTF-8 text", () => {
   assert.equal(translate("fa", "Settings"), "تنظیمات");
   assert.equal(translate("fa", "Welcome, {name}", { name: "عرشیا" }), "خوش آمدید، عرشیا");
+  assert.equal(translate("fa", "Your listening history, latest releases, popular tracks, and subscription-based access."), "سابقهٔ شنیدن، تازه‌ترین آثار، قطعه‌های محبوب و دسترسی‌های اشتراک شما.");
+  assert.equal(translate("fa", "Latest albums"), "تازه‌ترین آلبوم‌ها");
   assert.equal(localeForLanguage("fa"), "fa-IR");
+});
+
+test("provides a Persian translation for every literal frontend translation key", () => {
+  const sourceRoots = ["app", "components"];
+  const missing = [];
+
+  for (const sourceRoot of sourceRoots) {
+    const files = fs.readdirSync(path.join(process.cwd(), sourceRoot), { recursive: true, withFileTypes: true });
+    for (const file of files) {
+      if (!file.isFile() || path.extname(file.name) !== ".tsx") continue;
+      const sourcePath = path.join(file.parentPath, file.name);
+      const source = fs.readFileSync(sourcePath, "utf8");
+      for (const match of source.matchAll(/\bt\(\s*(["'])(.*?)\1/g)) {
+        if (!Object.hasOwn(PERSIAN_LABELS, match[2])) missing.push(`${sourcePath}: ${match[2]}`);
+      }
+    }
+  }
+
+  assert.deepEqual(missing, []);
+});
+
+test("keeps the selected language global across preference refreshes", () => {
+  const provider = fs.readFileSync(path.join(process.cwd(), "providers", "UserPreferencesProvider.tsx"), "utf8");
+  const settings = fs.readFileSync(path.join(process.cwd(), "app", "settings", "page.tsx"), "utf8");
+
+  assert.match(provider, /preferenceRevision/);
+  assert.match(provider, /setLanguage/);
+  assert.doesNotMatch(provider, /catch\(\(\) => setPreferences\(DEFAULT_USER_PREFERENCES\)\)/);
+  assert.match(settings, /setLanguage\(language\)/);
+  assert.doesNotMatch(settings, /Promise\.all\(\[accountApi\.getPreferences\(\), planApi\.list\(\)\]\)/);
+});
+
+test("keeps visible frontend copy behind the translation layer", () => {
+  const allowedLiteralText = new Set(["SoundWave"]);
+  const allowedLiteralAttributes = new Set(["https://..."]);
+  const translatableAttributes = new Set(["alt", "aria-label", "title", "label", "description", "placeholder", "header", "emptyMessage", "helperText", "confirmLabel"]);
+  const violations = [];
+  const files = ["app", "components"].flatMap((sourceRoot) =>
+    fs.readdirSync(path.join(process.cwd(), sourceRoot), { recursive: true, withFileTypes: true })
+      .filter((file) => file.isFile() && path.extname(file.name) === ".tsx")
+      .map((file) => path.join(file.parentPath, file.name))
+  );
+
+  for (const sourcePath of files) {
+    const source = fs.readFileSync(sourcePath, "utf8");
+    const sourceFile = ts.createSourceFile(sourcePath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const visit = (node) => {
+      if (ts.isJsxText(node)) {
+        const text = node.getText(sourceFile).trim();
+        if (/^[A-Za-z]/.test(text) && !allowedLiteralText.has(text)) violations.push(`${sourcePath}: ${text}`);
+      }
+      if (ts.isJsxAttribute(node) && translatableAttributes.has(node.name.text) && node.initializer && ts.isStringLiteral(node.initializer)) {
+        const text = node.initializer.text;
+        if (/^[A-Za-z]/.test(text) && !allowedLiteralAttributes.has(text)) violations.push(`${sourcePath}: ${text}`);
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sourceFile);
+  }
+
+  assert.deepEqual(violations, []);
 });
 
 test("keeps frontend source files free of common UTF-8 mojibake", () => {
@@ -103,6 +167,14 @@ test("bundles professional fonts for English and Persian interfaces", () => {
   assert.match(layoutSource, /@fontsource-variable\/vazirmatn/);
   assert.match(globalStyles, /html\[lang="fa"\] body/);
   assert.match(globalStyles, /font-family: var\(--font-persian\)/);
+});
+
+test("expires stale PWA bundles when frontend translations change", () => {
+  const serviceWorker = fs.readFileSync(path.join(process.cwd(), "public", "sw.js"), "utf8");
+  const registration = fs.readFileSync(path.join(process.cwd(), "components", "PwaRegistration.tsx"), "utf8");
+
+  assert.match(serviceWorker, /caches\.delete/);
+  assert.match(registration, /updateViaCache: "none"/);
 });
 
 test("applies basic playlist limits", () => {

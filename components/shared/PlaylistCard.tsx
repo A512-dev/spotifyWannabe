@@ -15,7 +15,7 @@ export function PlaylistCard({ playlist }: PlaylistCardProps) {
     <Card>
       {playlist.coverImageUrl ? (
         <img
-          alt={`${playlist.title} cover`}
+          alt={t("{title} cover", { title: playlist.title })}
           className="aspect-square w-full rounded-md object-cover"
           src={playlist.coverImageUrl}
         />

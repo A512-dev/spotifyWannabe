@@ -57,7 +57,7 @@ export default function ProfilePage() {
     });
     setSaving(false);
     if (!result.ok) {
-      setError(result.error ?? t("Could not update your profile."));
+      setError(t(result.error ?? "Could not update your profile."));
       return;
     }
     setAvatarFile(null);

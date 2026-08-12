@@ -55,7 +55,7 @@ export default function ArtistProfilePage({ params }: ArtistProfilePageProps) {
   return (
     <MainAppLayout>
       <section className="overflow-hidden rounded-lg border border-surface-700 bg-surface-800">
-        <div className="h-48 bg-surface-700">{artist.bannerImageUrl ? <img alt={`${artist.stageName} banner`} className="h-full w-full object-cover" src={artist.bannerImageUrl} /> : null}</div>
+        <div className="h-48 bg-surface-700">{artist.bannerImageUrl ? <img alt={t("{name} banner", { name: artist.stageName })} className="h-full w-full object-cover" src={artist.bannerImageUrl} /> : null}</div>
         <div className="px-6 pb-6">
           <div className="-mt-16 flex flex-col gap-4 sm:flex-row sm:items-end">
             {artist.profileImageUrl ? <img alt={artist.stageName} className="h-32 w-32 rounded-lg border-4 border-surface-800 object-cover shadow-xl" src={artist.profileImageUrl} /> : <div className="flex h-32 w-32 items-center justify-center rounded-lg border-4 border-surface-800 bg-surface-700 text-sm text-slate-400">{t("Artist")}</div>}

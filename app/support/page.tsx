@@ -64,11 +64,11 @@ function SupportContent() {
         setOverview(supportOverview);
       }
     } catch (error) {
-      setNotice(messageFrom(error));
+      setNotice(t(messageFrom(error)));
     } finally {
       setLoading(false);
     }
-  }, [isStaff, search, statusFilter]);
+  }, [isStaff, search, statusFilter, t]);
 
   useEffect(() => {
     if (currentUser) void loadData();
@@ -81,25 +81,25 @@ function SupportContent() {
     if (ticketId) {
       void operationsApi.getTicket(ticketId)
         .then(setSelectedTicket)
-        .catch((error) => setNotice(messageFrom(error)));
+        .catch((error) => setNotice(t(messageFrom(error))));
     }
     if (applicationId) {
       void operationsApi.getApplication(applicationId)
         .then(setSelectedApplication)
-        .catch((error) => setNotice(messageFrom(error)));
+        .catch((error) => setNotice(t(messageFrom(error))));
     }
-  }, [currentUser, searchParams]);
+  }, [currentUser, searchParams, t]);
 
-  const openTicket = async (ticket: TicketApi) => {
+  const openTicket = useCallback(async (ticket: TicketApi) => {
     setBusy(true);
     try {
       setSelectedTicket(await operationsApi.getTicket(ticket.id));
     } catch (error) {
-      setNotice(messageFrom(error));
+      setNotice(t(messageFrom(error)));
     } finally {
       setBusy(false);
     }
-  };
+  }, [t]);
 
   const refreshSelectedTicket = async () => {
     if (!selectedTicket) return;
@@ -116,7 +116,7 @@ function SupportContent() {
       await refreshSelectedTicket();
       await loadData();
     } catch (error) {
-      setNotice(messageFrom(error));
+      setNotice(t(messageFrom(error)));
     } finally {
       setBusy(false);
     }
@@ -130,7 +130,7 @@ function SupportContent() {
       await refreshSelectedTicket();
       await loadData();
     } catch (error) {
-      setNotice(messageFrom(error));
+      setNotice(t(messageFrom(error)));
     } finally {
       setBusy(false);
     }
@@ -147,7 +147,7 @@ function SupportContent() {
       setNotice(t("Ticket created successfully."));
       await loadData();
     } catch (error) {
-      setNotice(messageFrom(error));
+      setNotice(t(messageFrom(error)));
     } finally {
       setBusy(false);
     }
@@ -163,7 +163,7 @@ function SupportContent() {
       setNotice(t("Artist application {decision}.", { decision: t(decision) }));
       await loadData();
     } catch (error) {
-      setNotice(messageFrom(error));
+      setNotice(t(messageFrom(error)));
     } finally {
       setBusy(false);
     }
@@ -184,7 +184,7 @@ function SupportContent() {
     { key: "created", header: t("Submitted"), render: (row) => formatDate(row.createdAt, locale) },
     { key: "status", header: t("Status"), render: (row) => <Badge tone={statusTone[row.status]}>{t(row.status.replaceAll("_", " "))}</Badge> },
     { key: "priority", header: t("Priority"), render: (row) => <Badge>{t(row.priority)}</Badge> }
-  ], [locale, t]);
+  ], [locale, openTicket, t]);
 
   const applicationColumns = useMemo<TableColumn<ArtistApplicationApi>[]>(() => [
     { key: "artist", header: t("Artist"), render: (row) => <span className="font-medium text-slate-50">{row.stageName}</span> },
