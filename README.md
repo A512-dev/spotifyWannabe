@@ -4,6 +4,8 @@ SoundWave is a full-stack music-streaming service inspired by Spotify. It was de
 
 The project combines a responsive, role-aware Next.js frontend with a Django REST Framework backend. It supports listeners, approved artists, support agents, and one system administrator. The delivery version includes persistent authentication, media uploads, subscriptions, payments, reports, artist accounting, and complete frontend-backend integration.
 
+For a source-oriented tour of every subsystem, endpoint, state provider, workflow, test area, and known sharp edge, read [`docs/codebase-catch-up.md`](docs/codebase-catch-up.md).
+
 ## Table of Contents
 
 - [Team and responsibilities](#team-and-responsibilities)
