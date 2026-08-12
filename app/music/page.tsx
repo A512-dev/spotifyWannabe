@@ -94,7 +94,7 @@ function MusicContent() {
         <h2 className="mb-4 text-xl font-bold">{t("Tracks")}</h2>
         <div className="grid gap-3 lg:grid-cols-2">
           {tracks.map((track) => (
-            <TrackCard artistName={track.artistName ?? "Unknown artist"} key={track.id} onSelect={targetPlaylistId ? handleSelect : undefined} track={track} />
+            <TrackCard artistName={track.artistName ?? t("Unknown artist")} key={track.id} onSelect={targetPlaylistId ? handleSelect : undefined} track={track} />
           ))}
         </div>
       </section>

@@ -1,4 +1,4 @@
-const CACHE_NAME = "spotifywannabe-static-v2";
+const CACHE_NAME = "spotifywannabe-static-v3";
 const CACHE_PREFIX = "spotifywannabe-static-";
 const STATIC_ASSET_PATH = /\/(?:_next\/static\/|.*\.(?:css|js|svg|png|jpg|jpeg|webp|woff2?))$/i;
 
