@@ -76,7 +76,7 @@ test("formats currency from cents", () => {
 
 test("translates Persian labels without corrupting UTF-8 text", () => {
   assert.equal(translate("fa", "Settings"), "تنظیمات");
-  assert.equal(translate("fa", "Welcome, {name}", { name: "آرشیا" }), "خوش آمدید، آرشیا");
+  assert.equal(translate("fa", "Welcome, {name}", { name: "عرشیا" }), "خوش آمدید، عرشیا");
   assert.equal(localeForLanguage("fa"), "fa-IR");
 });
 
