@@ -95,6 +95,16 @@ test("keeps frontend source files free of common UTF-8 mojibake", () => {
   }
 });
 
+test("bundles professional fonts for English and Persian interfaces", () => {
+  const layoutSource = fs.readFileSync(path.join(process.cwd(), "app", "layout.tsx"), "utf8");
+  const globalStyles = fs.readFileSync(path.join(process.cwd(), "app", "globals.css"), "utf8");
+
+  assert.match(layoutSource, /@fontsource-variable\/manrope/);
+  assert.match(layoutSource, /@fontsource-variable\/vazirmatn/);
+  assert.match(globalStyles, /html\[lang="fa"\] body/);
+  assert.match(globalStyles, /font-family: var\(--font-persian\)/);
+});
+
 test("applies basic playlist limits", () => {
   assert.equal(formatPlaylistLimit("basic"), "6");
   assert.equal(canCreatePlaylist(basicListener, 5), true);

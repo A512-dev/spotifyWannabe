@@ -4,6 +4,8 @@
 
 :root {
   color-scheme: dark; /* تغییر به حالت دارک برای هماهنگی با بنفش تیره */
+  --font-interface: "Manrope Variable", "Segoe UI", sans-serif;
+  --font-persian: "Vazirmatn Variable", Tahoma, sans-serif;
 }
 
 * {
@@ -19,11 +21,37 @@ body {
   margin: 0;
   background: #1a0b2e;
   color: #f8fafc;
-  font-family: Arial, sans-serif;
+  font-family: var(--font-interface);
+  font-optical-sizing: auto;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 html[lang="fa"] body {
-  font-family: Tahoma, "Segoe UI", Arial, sans-serif;
+  font-family: var(--font-persian);
+  font-feature-settings: "kern" 1, "ss01" 1;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: inherit;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+html[lang="fa"] h1,
+html[lang="fa"] h2,
+html[lang="fa"] h3,
+html[lang="fa"] h4,
+html[lang="fa"] h5,
+html[lang="fa"] h6 {
+  letter-spacing: 0;
 }
 
 html[dir="rtl"] input[type="email"],

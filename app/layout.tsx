@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { AppProviders } from "@/providers/AppProviders";
 import { PwaRegistration } from "@/components/PwaRegistration";
+import "@fontsource-variable/manrope";
+import "@fontsource-variable/vazirmatn";
 import "./globals.css";
 
 export const metadata: Metadata = {

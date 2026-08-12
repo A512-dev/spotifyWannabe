@@ -10,6 +10,10 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["var(--font-interface)"],
+        persian: ["var(--font-persian)"]
+      },
       colors: {
         surface: {
           900: "#121212",
