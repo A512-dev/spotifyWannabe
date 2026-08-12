@@ -6,7 +6,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { AuthLayout } from "@/components/layout/AuthLayout";
 import { Button, Checkbox, Input, Modal, Select, Tabs, Textarea } from "@/components/ui";
-import { useAuth } from "@/providers";
+import { useAuth, useUserPreferences } from "@/providers";
 import type { Gender } from "@/types";
 
 function value(formData: FormData, name: string) {
@@ -17,6 +17,7 @@ function value(formData: FormData, name: string) {
 export default function SignupPage() {
   const router = useRouter();
   const { registerListener, submitArtistApplication } = useAuth();
+  const { t } = useUserPreferences();
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [acceptedPrivacyPolicy, setAcceptedPrivacyPolicy] = useState(false);
   const [listenerError, setListenerError] = useState("");
@@ -31,11 +32,11 @@ export default function SignupPage() {
     const confirmation = value(formData, "confirmPassword");
     setListenerError("");
     if (password !== confirmation) {
-      setListenerError("Password and confirmation do not match.");
+      setListenerError(t("Password and confirmation do not match."));
       return;
     }
     if (!acceptedPrivacyPolicy) {
-      setListenerError("You must accept the privacy policy.");
+      setListenerError(t("You must accept the privacy policy."));
       return;
     }
     setSubmitting(true);
@@ -49,7 +50,7 @@ export default function SignupPage() {
     });
     setSubmitting(false);
     if (!result.ok) {
-      setListenerError(result.error ?? "Could not create the account.");
+      setListenerError(result.error ?? t("Could not create the account."));
       return;
     }
     router.push("/");
@@ -66,15 +67,15 @@ export default function SignupPage() {
     setArtistError("");
     setArtistSuccess("");
     if (password !== confirmation) {
-      setArtistError("Password and confirmation do not match.");
+      setArtistError(t("Password and confirmation do not match."));
       return;
     }
     if (!sampleLink && files.length === 0) {
-      setArtistError("Provide at least one portfolio link or file.");
+      setArtistError(t("Provide at least one portfolio link or file."));
       return;
     }
     if (!acceptedPrivacyPolicy) {
-      setArtistError("You must accept the privacy policy.");
+      setArtistError(t("You must accept the privacy policy."));
       return;
     }
     setSubmitting(true);
@@ -89,75 +90,75 @@ export default function SignupPage() {
     });
     setSubmitting(false);
     if (!result.ok || !result.data) {
-      setArtistError(result.error ?? "Could not submit the artist application.");
+      setArtistError(result.error ?? t("Could not submit the artist application."));
       return;
     }
     form.reset();
-    setArtistSuccess(`${result.data.stageName} is now pending approval.`);
+    setArtistSuccess(t("{name} is now pending approval.", { name: result.data.stageName }));
     router.push("/notifications");
   };
 
   const privacyCheckbox = (
     <Checkbox
       checked={acceptedPrivacyPolicy}
-      label={<span>I accept the <button className="text-brand-500" onClick={() => setPrivacyOpen(true)} type="button">privacy policy</button></span>}
+      label={<span>{t("I accept the")} <button className="text-brand-500" onClick={() => setPrivacyOpen(true)} type="button">{t("privacy policy")}</button></span>}
       name="privacyPolicy"
       onChange={(event) => setAcceptedPrivacyPolicy(event.target.checked)}
     />
   );
 
   return (
-    <AuthLayout description="Create a listener account or submit an artist application for review." title="Create account">
+    <AuthLayout description={t("Create a listener account or submit an artist application for review.")} title={t("Create account")}>
       <Tabs tabs={[
         {
           id: "listener",
-          label: "Listener",
+          label: t("Listener"),
           content: (
             <form className="space-y-4" onSubmit={handleListenerSignup}>
-              <Input label="Display name" name="displayName" required />
-              <Input label="Email" name="email" required type="email" />
-              <Input label="Password" name="password" required type="password" />
-              <Input label="Confirm password" name="confirmPassword" required type="password" />
-              <Input label="Birth date" name="birthDate" required type="date" />
-              <Select label="Gender" name="gender" options={[
-                { label: "Select gender", value: "" },
-                { label: "Female", value: "female" },
-                { label: "Male", value: "male" },
-                { label: "Other", value: "other" },
-                { label: "Prefer not to say", value: "prefer_not_to_say" }
+              <Input label={t("Display name")} name="displayName" required />
+              <Input label={t("Email")} name="email" required type="email" />
+              <Input label={t("Password")} name="password" required type="password" />
+              <Input label={t("Confirm password")} name="confirmPassword" required type="password" />
+              <Input label={t("Birth date")} name="birthDate" required type="date" />
+              <Select label={t("Gender")} name="gender" options={[
+                { label: t("Select gender"), value: "" },
+                { label: t("Female"), value: "female" },
+                { label: t("Male"), value: "male" },
+                { label: t("Other"), value: "other" },
+                { label: t("Prefer not to say"), value: "prefer_not_to_say" }
               ]} required />
               {privacyCheckbox}
               {listenerError ? <p className="text-sm text-red-300">{listenerError}</p> : null}
-              <Button className="w-full" disabled={submitting} type="submit">Sign up as listener</Button>
+              <Button className="w-full" disabled={submitting} type="submit">{t("Sign up as listener")}</Button>
             </form>
           )
         },
         {
           id: "artist",
-          label: "Artist",
+          label: t("Artist"),
           content: (
             <form className="space-y-4" onSubmit={handleArtistSignup}>
-              <Input label="Email" name="artistEmail" required type="email" />
-              <Input label="Password" name="artistPassword" required type="password" />
-              <Input label="Confirm password" name="artistConfirmPassword" required type="password" />
-              <Input label="Stage name" name="stageName" required />
-              <Textarea label="Portfolio description" name="portfolioDescription" />
-              <Input label="Portfolio link" name="portfolioLink" placeholder="https://..." type="url" />
+              <Input label={t("Email")} name="artistEmail" required type="email" />
+              <Input label={t("Password")} name="artistPassword" required type="password" />
+              <Input label={t("Confirm password")} name="artistConfirmPassword" required type="password" />
+              <Input label={t("Stage name")} name="stageName" required />
+              <Textarea label={t("Portfolio description")} name="portfolioDescription" />
+              <Input label={t("Portfolio link")} name="portfolioLink" placeholder="https://..." type="url" />
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-200" htmlFor="portfolioFiles">Portfolio files</label>
+                <label className="mb-1 block text-sm font-medium text-slate-200" htmlFor="portfolioFiles">{t("Portfolio files")}</label>
                 <input className="block w-full text-sm text-slate-300" id="portfolioFiles" multiple name="portfolioFiles" type="file" />
               </div>
               {privacyCheckbox}
               {artistError ? <p className="text-sm text-red-300">{artistError}</p> : null}
               {artistSuccess ? <p className="text-sm text-brand-500">{artistSuccess}</p> : null}
-              <Button className="w-full" disabled={submitting} type="submit">Submit artist application</Button>
+              <Button className="w-full" disabled={submitting} type="submit">{t("Submit artist application")}</Button>
             </form>
           )
         }
       ]} />
-      <p className="mt-4 text-sm text-slate-400">Already have an account? <Link className="text-slate-50" href="/login">Log in</Link></p>
-      <Modal onClose={() => setPrivacyOpen(false)} open={privacyOpen} title="Privacy policy">
-        <p className="text-sm leading-6 text-slate-300">SoundWave stores account, listening, playlist, support, and payment data only to provide the service. Uploaded media and profile information are handled according to the project requirements.</p>
+      <p className="mt-4 text-sm text-slate-400">{t("Already have an account?")} <Link className="text-slate-50" href="/login">{t("Log in")}</Link></p>
+      <Modal onClose={() => setPrivacyOpen(false)} open={privacyOpen} title={t("Privacy policy")}>
+        <p className="text-sm leading-6 text-slate-300">{t("SoundWave stores account, listening, playlist, support, and payment data only to provide the service. Uploaded media and profile information are handled according to the project requirements.")}</p>
       </Modal>
     </AuthLayout>
   );

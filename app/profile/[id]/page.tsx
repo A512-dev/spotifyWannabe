@@ -24,7 +24,7 @@ export default function PublicUserProfilePage({ params }: { params: Promise<{ id
       .then(setUser)
       .catch((requestError) => setError(requestError instanceof ApiError ? requestError.message : t("User could not be loaded.")))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, t]);
 
   const toggleFollow = async () => {
     if (!user) return;

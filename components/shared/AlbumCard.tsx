@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { formatDate } from "@/lib/formatters";
+import { useUserPreferences } from "@/providers";
 import type { Album } from "@/types/domain";
 
 interface AlbumCardProps {
@@ -11,6 +12,7 @@ interface AlbumCardProps {
 
 export function AlbumCard({ album, artistName }: AlbumCardProps) {
   const router = useRouter();
+  const { locale, t } = useUserPreferences();
 
   const handleArtistClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -31,7 +33,7 @@ export function AlbumCard({ album, artistName }: AlbumCardProps) {
         />
       ) : (
         <div className="aspect-square rounded-md bg-brand-primary/20 flex items-center justify-center text-white/40">
-          No Cover
+          {t("No Cover")}
         </div>
       )}
       
@@ -49,11 +51,11 @@ export function AlbumCard({ album, artistName }: AlbumCardProps) {
           {artistName}
         </span>
       ) : (
-        <p className="truncate text-sm text-white/40 mt-0.5">Unknown artist</p>
+        <p className="truncate text-sm text-white/40 mt-0.5">{t("Unknown artist")}</p>
       )}
       
       {/* تاریخ انتشار */}
-      <p className="mt-2 text-xs text-white/40">{formatDate(album.releaseDate)}</p>
+      <p className="mt-2 text-xs text-white/40">{formatDate(album.releaseDate, locale)}</p>
     </div>
   );
 }

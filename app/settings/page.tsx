@@ -15,7 +15,7 @@ import { DEFAULT_USER_PREFERENCES, useAuth, useUserPreferences } from "@/provide
 export default function SettingsPage() {
   const router = useRouter();
   const { currentUser, deleteCurrentUser } = useAuth();
-  const { preferences: appliedPreferences, setPreferences: applyPreferences, t } = useUserPreferences();
+  const { locale, preferences: appliedPreferences, setPreferences: applyPreferences, t } = useUserPreferences();
   const [preferences, setPreferences] = useState<PreferenceResponse>(DEFAULT_USER_PREFERENCES);
   const [plans, setPlans] = useState<SubscriptionPlanApi[]>([]);
   const [selectedTier, setSelectedTier] = useState<"silver" | "gold">("silver");
@@ -41,7 +41,7 @@ export default function SettingsPage() {
 
   const selectedPlan = useMemo(() => plans.find((plan) => plan.tier === selectedTier), [plans, selectedTier]);
 
-  if (!currentUser) return <MainAppLayout>Loading settings...</MainAppLayout>;
+  if (!currentUser) return <MainAppLayout>{t("Loading settings...")}</MainAppLayout>;
 
   const handleSave = async () => {
     setSaving(true);
@@ -51,9 +51,9 @@ export default function SettingsPage() {
       const next = await accountApi.updatePreferences(preferences);
       setPreferences(next);
       applyPreferences(next);
-      setSuccessMessage("Settings saved.");
+      setSuccessMessage(t("Settings saved."));
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Could not save settings.");
+      setError(requestError instanceof Error ? requestError.message : t("Could not save settings."));
     } finally {
       setSaving(false);
     }
@@ -66,7 +66,7 @@ export default function SettingsPage() {
       const result = await subscriptionApi.initiate(selectedTier, months, callbackUrl);
       window.location.assign(result.paymentUrl);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Could not start payment.");
+      setError(requestError instanceof Error ? requestError.message : t("Could not start payment."));
     }
   };
 
@@ -74,7 +74,7 @@ export default function SettingsPage() {
     const result = await deleteCurrentUser();
     setDeleteDialogOpen(false);
     if (!result.ok) {
-      setError(result.error ?? "Could not delete this account.");
+      setError(result.error ?? t("Could not delete this account."));
       return;
     }
     router.replace("/signup");
@@ -82,7 +82,7 @@ export default function SettingsPage() {
 
   return (
     <MainAppLayout>
-      <PageHeader description="Manage synchronized preferences, subscription status, and account removal." title={t("Settings")} />
+      <PageHeader description={t("Manage synchronized preferences, subscription status, and account removal.")} title={t("Settings")} />
       <section className="mt-6 grid gap-4 lg:grid-cols-2">
         <Card>
           <h2 className="text-lg font-semibold text-slate-50">{t("Preferences")}</h2>
@@ -90,7 +90,11 @@ export default function SettingsPage() {
             <Select
               label={t("Language")}
               name="language"
-              onChange={(event) => setPreferences((value) => ({ ...value, language: event.target.value as "en" | "fa" }))}
+              onChange={(event) => {
+                const language = event.target.value as "en" | "fa";
+                setPreferences((value) => ({ ...value, language }));
+                applyPreferences({ ...appliedPreferences, language });
+              }}
               options={[{ label: t("English"), value: "en" }, { label: t("Persian"), value: "fa" }]}
               value={preferences.language}
             />
@@ -105,14 +109,14 @@ export default function SettingsPage() {
 
         <Card>
           <h2 className="text-lg font-semibold text-slate-50">{t("Subscription")}</h2>
-          <p className="mt-2 text-sm text-slate-400">Current plan: {getSubscriptionLabel(currentUser.subscriptionTier)}</p>
+          <p className="mt-2 text-sm text-slate-400">{t("Current plan: {plan}", { plan: t(getSubscriptionLabel(currentUser.subscriptionTier)) })}</p>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <Select label={t("Plan")} name="plan" onChange={(e) => setSelectedTier(e.target.value as "silver" | "gold")} options={[{ label: "Silver", value: "silver" }, { label: "Gold", value: "gold" }]} value={selectedTier} />
-            <Select label={t("Billing period")} name="months" onChange={(e) => setMonths(Number(e.target.value) as 1 | 3 | 6 | 12)} options={[1, 3, 6, 12].map((value) => ({ label: `${value} month${value > 1 ? "s" : ""}`, value: String(value) }))} value={String(months)} />
+            <Select label={t("Plan")} name="plan" onChange={(e) => setSelectedTier(e.target.value as "silver" | "gold")} options={[{ label: t("Silver"), value: "silver" }, { label: t("Gold"), value: "gold" }]} value={selectedTier} />
+            <Select label={t("Billing period")} name="months" onChange={(e) => setMonths(Number(e.target.value) as 1 | 3 | 6 | 12)} options={[1, 3, 6, 12].map((value) => ({ label: t("{count} month", { count: new Intl.NumberFormat(locale).format(value) }), value: String(value) }))} value={String(months)} />
           </div>
           {selectedPlan ? (
             <p className="mt-4 text-sm text-slate-300">
-              Total: {formatCurrencyFromCents(selectedPlan.periodPrices[String(months)] ?? selectedPlan.monthlyPriceCents * months, selectedPlan.currency)}
+              {t("Total: {amount}", { amount: formatCurrencyFromCents(selectedPlan.periodPrices[String(months)] ?? selectedPlan.monthlyPriceCents * months, selectedPlan.currency, locale) })}
             </p>
           ) : null}
           <Button className="mt-4" onClick={handleUpgrade}>{t("Continue to payment")}</Button>
@@ -122,7 +126,7 @@ export default function SettingsPage() {
       <section className="mt-6">
         <Card>
           <h2 className="text-lg font-semibold text-red-300">{t("Danger zone")}</h2>
-          <p className="mt-2 text-sm text-slate-400">Account deletion removes personal profile data and access immediately. Required accounting and support audit rows remain under an anonymous inactive user.</p>
+          <p className="mt-2 text-sm text-slate-400">{t("Account deletion removes personal profile data and access immediately. Required accounting and support audit rows remain under an anonymous inactive user.")}</p>
           <Button className="mt-4" onClick={() => setDeleteDialogOpen(true)} variant="danger">{t("Delete account")}</Button>
         </Card>
       </section>
@@ -131,12 +135,12 @@ export default function SettingsPage() {
       {successMessage ? <p className="mt-4 text-sm text-brand-500">{successMessage}</p> : null}
 
       <ConfirmDialog
-        confirmLabel="Delete account"
-        description="This action cannot be undone."
+        confirmLabel={t("Delete account")}
+        description={t("This action cannot be undone.")}
         onCancel={() => setDeleteDialogOpen(false)}
         onConfirm={() => void handleDeleteAccount()}
         open={deleteDialogOpen}
-        title="Delete your account?"
+        title={t("Delete your account?")}
       />
     </MainAppLayout>
   );

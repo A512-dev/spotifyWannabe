@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { MainAppLayout } from "@/components/layout/MainAppLayout";
 import { EmptyState, PageHeader, PlaylistCard, TrackCard } from "@/components/shared";
@@ -24,7 +24,7 @@ export default function PlaylistsPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const response = await musicApi.listPlaylists();
@@ -35,9 +35,9 @@ export default function PlaylistsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
 
-  useEffect(() => { if (currentUser) void load(); }, [currentUser]);
+  useEffect(() => { if (currentUser) void load(); }, [currentUser, load]);
 
   const playlistLimit = currentUser ? getPlaylistLimit(currentUser.subscriptionTier) : 0;
   const limitLabel = Number.isFinite(playlistLimit) ? new Intl.NumberFormat(locale).format(playlistLimit) : t("Unlimited");

@@ -1,5 +1,8 @@
+"use client";
+
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
+import { useUserPreferences } from "@/providers";
 import type { Playlist } from "@/types/domain";
 
 interface PlaylistCardProps {
@@ -7,6 +10,7 @@ interface PlaylistCardProps {
 }
 
 export function PlaylistCard({ playlist }: PlaylistCardProps) {
+  const { t } = useUserPreferences();
   return (
     <Card>
       {playlist.coverImageUrl ? (
@@ -22,10 +26,10 @@ export function PlaylistCard({ playlist }: PlaylistCardProps) {
         <div className="min-w-0">
           <p className="truncate font-medium text-slate-50">{playlist.title}</p>
           <p className="mt-1 line-clamp-2 text-sm text-slate-400">
-            {playlist.description ?? "No description yet."}
+            {playlist.description ?? t("No description yet.")}
           </p>
         </div>
-        <Badge>{playlist.isPublic ? "Public" : "Private"}</Badge>
+        <Badge>{t(playlist.isPublic ? "Public" : "Private")}</Badge>
       </div>
     </Card>
   );

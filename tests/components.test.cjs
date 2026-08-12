@@ -10,6 +10,7 @@ const { artists } = require("@/data/artists");
 const { tracks } = require("@/data/tracks");
 const { getPlaylistStorageKey, readStoredPlaylists, writeStoredPlaylists } = require("@/lib/playlist-storage");
 const { PlayerProvider } = require("@/providers/PlayerProvider");
+const { UserPreferencesProvider } = require("@/providers/UserPreferencesProvider");
 
 function render(element) {
   return renderToStaticMarkup(element);
@@ -105,12 +106,16 @@ test("renders track cards with artist links and play metadata", () => {
       AuthProvider,
       null,
       React.createElement(
-        PlayerProvider,
+        UserPreferencesProvider,
         null,
-        React.createElement(TrackCard, {
-          artistName: artist.stageName,
-          track
-        })
+        React.createElement(
+          PlayerProvider,
+          null,
+          React.createElement(TrackCard, {
+            artistName: artist.stageName,
+            track
+          })
+        )
       )
     )
   );
@@ -123,7 +128,17 @@ test("renders track cards with artist links and play metadata", () => {
 test("renders album cards with album and artist names", () => {
   const album = albums.find((item) => item.id === "album-after-midnight");
   const artist = artists.find((item) => item.id === album.artistId);
-  const html = render(React.createElement(AlbumCard, { album, artistName: artist.stageName }));
+  const html = render(
+    React.createElement(
+      AuthProvider,
+      null,
+      React.createElement(
+        UserPreferencesProvider,
+        null,
+        React.createElement(AlbumCard, { album, artistName: artist.stageName })
+      )
+    )
+  );
 
   assert.match(html, /After Midnight/);
   assert.match(html, /Lina Torres/);

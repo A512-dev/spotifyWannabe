@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { MainAppLayout } from "@/components/layout/MainAppLayout";
 import { EmptyState, NotificationCard, PageHeader } from "@/components/shared";
 import { Button } from "@/components/ui";
@@ -14,7 +14,7 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -25,9 +25,9 @@ export default function NotificationsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(); }, [load]);
 
   const unreadCount = useMemo(() => notifications.filter((item) => !item.readAt).length, [notifications]);
 
