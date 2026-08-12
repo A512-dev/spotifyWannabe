@@ -48,14 +48,14 @@ export function Topbar() {
           {/* کپسول‌های مدرن نقش و سابسکریپشن */}
           <div className="hidden gap-2.5 sm:flex items-center">
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase bg-white/10 text-white/80 border border-white/5">
-              {getRoleLabel(currentUser.role)}
+              {t(getRoleLabel(currentUser.role))}
             </span>
             <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold tracking-wide uppercase border ${
               isGold 
                 ? "bg-gradient-to-r from-amber-500/20 via-yellow-500/20 to-orange-500/20 text-amber-300 border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.15)] animate-pulse" 
                 : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
             }`}>
-              {getSubscriptionLabel(currentUser.subscriptionTier)}
+              {t(getSubscriptionLabel(currentUser.subscriptionTier))}
             </span>
           </div>
 

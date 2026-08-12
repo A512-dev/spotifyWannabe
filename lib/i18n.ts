@@ -443,6 +443,8 @@ const persianLabels: Record<string, string> = {
   "Release updated.": "اثر به‌روزرسانی شد.",
   "Artist profile updated.": "نمایهٔ هنرمند به‌روزرسانی شد.",
   "Could not read the audio duration.": "خواندن مدت فایل صوتی ممکن نشد.",
+  "Switch to Persian": "تغییر زبان به فارسی",
+  "Switch to English": "تغییر زبان به انگلیسی",
 };
 
 export function localeForLanguage(language: Language) {

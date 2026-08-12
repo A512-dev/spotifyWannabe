@@ -80,6 +80,21 @@ test("translates Persian labels without corrupting UTF-8 text", () => {
   assert.equal(localeForLanguage("fa"), "fa-IR");
 });
 
+test("keeps frontend source files free of common UTF-8 mojibake", () => {
+  const sourceRoots = ["app", "components", "config", "constants", "lib", "providers"];
+  const sourceExtensions = new Set([".css", ".ts", ".tsx"]);
+  const mojibake = /(?:Ã|Â|â€|â€“|â€”|â€¦|Ø|Ù|�|طھ|ظ‡|غŒ)/u;
+
+  for (const sourceRoot of sourceRoots) {
+    const files = fs.readdirSync(path.join(process.cwd(), sourceRoot), { recursive: true, withFileTypes: true });
+    for (const file of files) {
+      if (!file.isFile() || !sourceExtensions.has(path.extname(file.name))) continue;
+      const sourcePath = path.join(file.parentPath, file.name);
+      assert.doesNotMatch(fs.readFileSync(sourcePath, "utf8"), mojibake, `${sourcePath} contains mojibake`);
+    }
+  }
+});
+
 test("applies basic playlist limits", () => {
   assert.equal(formatPlaylistLimit("basic"), "6");
   assert.equal(canCreatePlaylist(basicListener, 5), true);
