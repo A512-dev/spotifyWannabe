@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { accountApi, type PreferenceResponse } from "@/features/account/api";
+import { getStoredLanguage, LANGUAGE_STORAGE_KEY, localeForLanguage, translate } from "@/lib/i18n";
 import { useAuth } from "@/providers/AuthProvider";
 
 export const DEFAULT_USER_PREFERENCES: PreferenceResponse = {
@@ -14,59 +15,26 @@ export const DEFAULT_USER_PREFERENCES: PreferenceResponse = {
   supportNotifications: true,
 };
 
-const persianLabels: Record<string, string> = {
-  Home: "خانه",
-  Music: "موسیقی",
-  Playlists: "فهرست‌های پخش",
-  "Artist Dashboard": "داشبورد هنرمند",
-  Support: "پشتیبانی",
-  Admin: "مدیریت",
-  Profile: "نمایه",
-  Notifications: "اعلان‌ها",
-  Settings: "تنظیمات",
-  Preferences: "ترجیحات",
-  Language: "زبان",
-  English: "انگلیسی",
-  Persian: "فارسی",
-  "System sounds": "صداهای سامانه",
-  "Enable notifications": "فعال‌سازی اعلان‌ها",
-  "Subscription expiry notifications": "اعلان‌های پایان اشتراک",
-  "Followed artist releases": "انتشارهای هنرمندان دنبال‌شده",
-  "Support ticket notifications": "اعلان‌های تیکت پشتیبانی",
-  "Save preferences": "ذخیرهٔ ترجیحات",
-  "Saving...": "در حال ذخیره...",
-  Subscription: "اشتراک",
-  Plan: "طرح",
-  "Billing period": "دورهٔ پرداخت",
-  "Continue to payment": "ادامه به پرداخت",
-  "Danger zone": "ناحیهٔ خطر",
-  "Delete account": "حذف حساب",
-  "Main navigation": "ناوبری اصلی",
-  Workspace: "فضای کاری",
-  Account: "حساب کاربری",
-  "Session Active": "نشست فعال",
-  "Log out": "خروج",
-  "Loading account...": "در حال بارگذاری حساب...",
-  "Sign in required": "ورود لازم است",
-  "Access denied": "دسترسی مجاز نیست",
-};
-
 interface UserPreferencesContextValue {
   preferences: PreferenceResponse;
   setPreferences: (value: PreferenceResponse) => void;
   refreshPreferences: () => Promise<void>;
-  t: (label: string) => string;
+  locale: string;
+  t: (label: string, values?: Record<string, string | number>) => string;
 }
 
 const UserPreferencesContext = createContext<UserPreferencesContextValue | undefined>(undefined);
 
 export function UserPreferencesProvider({ children }: { children: ReactNode }) {
   const { currentUser } = useAuth();
-  const [preferences, setPreferences] = useState(DEFAULT_USER_PREFERENCES);
+  const [preferences, setPreferences] = useState<PreferenceResponse>(() => ({
+    ...DEFAULT_USER_PREFERENCES,
+    language: getStoredLanguage()
+  }));
 
   const refreshPreferences = useCallback(async () => {
     if (!currentUser) {
-      setPreferences(DEFAULT_USER_PREFERENCES);
+      setPreferences({ ...DEFAULT_USER_PREFERENCES, language: getStoredLanguage() });
       return;
     }
     setPreferences(await accountApi.getPreferences());
@@ -80,6 +48,7 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
     const root = document.documentElement;
     root.lang = preferences.language;
     root.dir = preferences.language === "fa" ? "rtl" : "ltr";
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, preferences.language);
   }, [preferences.language]);
 
   useEffect(() => {
@@ -105,8 +74,12 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
     return () => document.removeEventListener("click", playClick, true);
   }, [preferences.systemSoundEnabled]);
 
-  const t = useCallback((label: string) => preferences.language === "fa" ? (persianLabels[label] ?? label) : label, [preferences.language]);
-  const value = useMemo(() => ({ preferences, setPreferences, refreshPreferences, t }), [preferences, refreshPreferences, t]);
+  const locale = localeForLanguage(preferences.language);
+  const t = useCallback(
+    (label: string, values?: Record<string, string | number>) => translate(preferences.language, label, values),
+    [preferences.language]
+  );
+  const value = useMemo(() => ({ preferences, setPreferences, refreshPreferences, locale, t }), [preferences, refreshPreferences, locale, t]);
   return <UserPreferencesContext.Provider value={value}>{children}</UserPreferencesContext.Provider>;
 }
 

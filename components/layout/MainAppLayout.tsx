@@ -37,9 +37,9 @@ export function MainAppLayout({ children }: { children: ReactNode }) {
       <main className="flex min-h-screen items-center justify-center bg-surface-light px-4">
         <section className="w-full max-w-md rounded-lg border border-brand-secondary/30 bg-white p-6 text-center shadow-md">
           <h1 className="text-xl font-semibold text-brand-primary">{t("Sign in required")}</h1>
-          <p className="mt-2 text-sm text-brand-primary/80">Please log in before opening this part of SoundWave.</p>
+          <p className="mt-2 text-sm text-brand-primary/80">{t("Please log in before opening this part of SoundWave.")}</p>
           <Button className="mt-5 bg-brand-primary hover:bg-brand-secondary text-white" onClick={() => router.push("/login")} type="button">
-            Go to login
+            {t("Go to login")}
           </Button>
         </section>
       </main>
@@ -51,9 +51,9 @@ export function MainAppLayout({ children }: { children: ReactNode }) {
       <main className="flex min-h-screen items-center justify-center bg-surface-light px-4">
         <section className="w-full max-w-md rounded-lg border border-brand-secondary/30 bg-white p-6 text-center shadow-md">
           <h1 className="text-xl font-semibold text-brand-primary">{t("Access denied")}</h1>
-          <p className="mt-2 text-sm text-brand-primary/80">Your current role does not have access to this page.</p>
+          <p className="mt-2 text-sm text-brand-primary/80">{t("Your current role does not have access to this page.")}</p>
           <Button className="mt-5 bg-brand-primary hover:bg-brand-secondary text-white" onClick={() => router.push(getPostLoginPath(currentUser))} type="button">
-            Go to your home
+            {t("Go to your home")}
           </Button>
         </section>
       </main>

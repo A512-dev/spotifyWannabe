@@ -10,6 +10,7 @@ const { tracks } = require("@/data/tracks");
 const { users } = require("@/data/users");
 const { authenticateUser, getPostLoginPath, normalizeEmail } = require("@/lib/auth");
 const { formatCurrencyFromCents, formatDuration, formatNumber } = require("@/lib/formatters");
+const { localeForLanguage, translate } = require("@/lib/i18n");
 const { canAccessRoute, filterNavigationForUser } = require("@/lib/permissions");
 const {
   canAccessAdvancedStats,
@@ -71,6 +72,12 @@ test("formats music-facing numbers and durations", () => {
 
 test("formats currency from cents", () => {
   assert.equal(formatCurrencyFromCents(1299, "USD"), "$12.99");
+});
+
+test("translates Persian labels without corrupting UTF-8 text", () => {
+  assert.equal(translate("fa", "Settings"), "تنظیمات");
+  assert.equal(translate("fa", "Welcome, {name}", { name: "آرشیا" }), "Welcome, آرشیا");
+  assert.equal(localeForLanguage("fa"), "fa-IR");
 });
 
 test("applies basic playlist limits", () => {

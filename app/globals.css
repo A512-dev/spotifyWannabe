@@ -17,8 +17,25 @@ body {
 
 body {
   margin: 0;
-  background: #1a0b2e; /* بنفش تیره عمیق */
-  color: #f8fafc;    /* متن‌های پیش‌فرض سفید/روشن شوند تا کاملاً خوانا باشند */
+  background: #1a0b2e;
+  color: #f8fafc;
+  font-family: Arial, sans-serif;
+}
+
+html[lang="fa"] body {
+  font-family: Tahoma, "Segoe UI", Arial, sans-serif;
+}
+
+html[dir="rtl"] input[type="email"],
+html[dir="rtl"] input[type="password"],
+html[dir="rtl"] input[type="url"] {
+  direction: ltr;
+  text-align: left;
+}
+
+.bidi-auto {
+  direction: auto;
+  unicode-bidi: plaintext;
 }
 
 a {
