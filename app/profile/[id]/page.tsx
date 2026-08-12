@@ -8,12 +8,13 @@ import { accountApi } from "@/features/account/api";
 import { ApiError } from "@/lib/api";
 import { formatDate, formatNumber } from "@/lib/formatters";
 import { getRoleLabel, getSubscriptionLabel } from "@/lib/labels";
-import { useAuth } from "@/providers";
+import { useAuth, useUserPreferences } from "@/providers";
 import type { PublicUser } from "@/types/domain";
 
 export default function PublicUserProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { currentUser } = useAuth();
+  const { locale, t } = useUserPreferences();
   const [user, setUser] = useState<PublicUser | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -21,7 +22,7 @@ export default function PublicUserProfilePage({ params }: { params: Promise<{ id
   useEffect(() => {
     void accountApi.getUser(id)
       .then(setUser)
-      .catch((requestError) => setError(requestError instanceof ApiError ? requestError.message : "User could not be loaded."))
+      .catch((requestError) => setError(requestError instanceof ApiError ? requestError.message : t("User could not be loaded.")))
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -31,25 +32,25 @@ export default function PublicUserProfilePage({ params }: { params: Promise<{ id
     setUser((value) => value ? { ...value, isFollowing: result.isFollowing, followerCount: result.followerCount } : value);
   };
 
-  if (loading) return <MainAppLayout>Loading user...</MainAppLayout>;
-  if (!user) return <MainAppLayout><EmptyState description={error || "The requested user does not exist."} title="User not found" /></MainAppLayout>;
+  if (loading) return <MainAppLayout>{t("Loading user...")}</MainAppLayout>;
+  if (!user) return <MainAppLayout><EmptyState description={error || t("The requested user does not exist.")} title={t("User not found")} /></MainAppLayout>;
 
   return (
     <MainAppLayout>
-      <PageHeader description="Public account information and listening summary." title={user.displayName} />
+      <PageHeader description={t("Public account information and listening summary.")} title={user.displayName} />
       <section className="mt-6 grid gap-4 lg:grid-cols-[320px_1fr]">
         <Card>
           <Avatar className="h-24 w-24 text-2xl" name={user.displayName} src={user.avatarUrl} />
           <h2 className="mt-4 text-xl font-semibold text-slate-50">{user.displayName}</h2>
           <p className="text-sm text-slate-400">@{user.username ?? user.id}</p>
-          <div className="mt-4 flex flex-wrap gap-2"><Badge>{getRoleLabel(user.role)}</Badge><Badge tone={user.subscriptionTier === "gold" ? "success" : "neutral"}>{getSubscriptionLabel(user.subscriptionTier)}</Badge></div>
-          {currentUser?.id !== user.id ? <Button className="mt-4 w-full" onClick={() => void toggleFollow()} variant={user.isFollowing ? "secondary" : "primary"}>{user.isFollowing ? "Unfollow" : "Follow"}</Button> : null}
+          <div className="mt-4 flex flex-wrap gap-2"><Badge>{t(getRoleLabel(user.role))}</Badge><Badge tone={user.subscriptionTier === "gold" ? "success" : "neutral"}>{t(getSubscriptionLabel(user.subscriptionTier))}</Badge></div>
+          {currentUser?.id !== user.id ? <Button className="mt-4 w-full" onClick={() => void toggleFollow()} variant={user.isFollowing ? "secondary" : "primary"}>{t(user.isFollowing ? "Unfollow" : "Follow")}</Button> : null}
         </Card>
         <div className="grid gap-4 sm:grid-cols-2">
-          <StatCard label="Followers" value={formatNumber(user.followerCount ?? 0)} />
-          <StatCard label="Following" value={formatNumber(user.followingCount ?? 0)} />
-          <StatCard label="Daily streams" value={formatNumber(user.dailyStreamCount ?? 0)} />
-          <StatCard label="Member since" value={formatDate(user.createdAt)} />
+          <StatCard label={t("Followers")} value={formatNumber(user.followerCount ?? 0, locale)} />
+          <StatCard label={t("Following")} value={formatNumber(user.followingCount ?? 0, locale)} />
+          <StatCard label={t("Daily streams")} value={formatNumber(user.dailyStreamCount ?? 0, locale)} />
+          <StatCard label={t("Member since")} value={formatDate(user.createdAt, locale)} />
         </div>
       </section>
     </MainAppLayout>

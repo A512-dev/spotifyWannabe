@@ -8,11 +8,12 @@ import { EmptyState, PageHeader, PlaylistCard, TrackCard } from "@/components/sh
 import { Button, Checkbox, Input, Modal, Textarea } from "@/components/ui";
 import { musicApi, type PlaylistWithItems } from "@/features/music/api";
 import { getPlaylistLimit } from "@/lib/subscription";
-import { useAuth, usePlayer } from "@/providers";
+import { useAuth, usePlayer, useUserPreferences } from "@/providers";
 
 export default function PlaylistsPage() {
   const { currentUser } = useAuth();
   const { playerState, setPlayerState } = usePlayer();
+  const { locale, t } = useUserPreferences();
   const [playlists, setPlaylists] = useState<PlaylistWithItems[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editing, setEditing] = useState<PlaylistWithItems | null>(null);
@@ -30,7 +31,7 @@ export default function PlaylistsPage() {
       setPlaylists(response.results);
       setError("");
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Could not load playlists.");
+      setError(requestError instanceof Error ? requestError.message : t("Could not load playlists."));
     } finally {
       setLoading(false);
     }
@@ -39,7 +40,7 @@ export default function PlaylistsPage() {
   useEffect(() => { if (currentUser) void load(); }, [currentUser]);
 
   const playlistLimit = currentUser ? getPlaylistLimit(currentUser.subscriptionTier) : 0;
-  const limitLabel = Number.isFinite(playlistLimit) ? String(playlistLimit) : "Unlimited";
+  const limitLabel = Number.isFinite(playlistLimit) ? new Intl.NumberFormat(locale).format(playlistLimit) : t("Unlimited");
 
   const openCreate = () => {
     setEditing(null);
@@ -73,7 +74,7 @@ export default function PlaylistsPage() {
       setIsModalOpen(false);
       await load();
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Could not save playlist.");
+      setError(requestError instanceof Error ? requestError.message : t("Could not save playlist."));
     }
   };
 
@@ -82,7 +83,7 @@ export default function PlaylistsPage() {
       await musicApi.deletePlaylist(id);
       setPlaylists((items) => items.filter((item) => item.id !== id));
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Could not delete playlist.");
+      setError(requestError instanceof Error ? requestError.message : t("Could not delete playlist."));
     }
   };
 
@@ -91,7 +92,7 @@ export default function PlaylistsPage() {
       await musicApi.removeTrackFromPlaylist(playlistId, trackId);
       await load();
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Could not remove track.");
+      setError(requestError instanceof Error ? requestError.message : t("Could not remove track."));
     }
   };
 
@@ -103,22 +104,22 @@ export default function PlaylistsPage() {
       localStorage.setItem("soundwave_active_queue", JSON.stringify(trackIds));
       setPlayerState({ ...playerState, currentTrackId: trackIds[0], queueTrackIds: trackIds, isPlaying: true });
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Could not play playlist.");
+      setError(requestError instanceof Error ? requestError.message : t("Could not play playlist."));
     }
   };
 
-  if (!currentUser) return <MainAppLayout>Loading playlists...</MainAppLayout>;
+  if (!currentUser) return <MainAppLayout>{t("Loading playlists...")}</MainAppLayout>;
 
   return (
     <MainAppLayout>
-      <PageHeader actions={<Button onClick={openCreate}>Create playlist</Button>} description="Create, rename, delete, and populate your playlists." title="Playlists" />
+      <PageHeader actions={<Button onClick={openCreate}>{t("Create playlist")}</Button>} description={t("Create, rename, delete, and populate your playlists.")} title={t("Playlists")} />
       <div className="mt-4 flex gap-3 text-xs text-slate-300">
-        <span>Your playlists: {playlists.length}</span><span>Limit: {limitLabel}</span>
+        <span>{t("Your playlists: {count}", { count: new Intl.NumberFormat(locale).format(playlists.length) })}</span><span>{t("Limit: {limit}", { limit: limitLabel })}</span>
       </div>
       {error ? <p className="mt-4 text-sm text-red-300">{error}</p> : null}
-      {loading ? <p className="mt-6 text-sm text-slate-400">Loading playlists...</p> : null}
+      {loading ? <p className="mt-6 text-sm text-slate-400">{t("Loading playlists...")}</p> : null}
       {!loading && playlists.length === 0 ? (
-        <div className="mt-8"><EmptyState action={<Button onClick={openCreate}>Create first playlist</Button>} description="Create your first playlist and add tracks from the music catalog." title="No playlists" /></div>
+        <div className="mt-8"><EmptyState action={<Button onClick={openCreate}>{t("Create first playlist")}</Button>} description={t("Create your first playlist and add tracks from the music catalog.")} title={t("No playlists")} /></div>
       ) : (
         <section className="mt-8 grid min-w-0 gap-6 pb-6 lg:grid-cols-2 xl:grid-cols-3">
           {playlists.map((playlist) => {
@@ -128,33 +129,33 @@ export default function PlaylistsPage() {
               <div className="min-w-0 rounded-xl border border-white/5 bg-white/[0.02] p-4" key={playlist.id}>
                 <PlaylistCard playlist={playlist} />
                 <div className="mt-3 flex flex-wrap justify-between gap-2 border-t border-white/5 pt-3">
-                  <Button disabled={!tracks.length} onClick={() => void playPlaylist(playlist)} size="sm">Play</Button>
-                  <Link className="rounded-md bg-white/10 px-3 py-1.5 text-xs font-bold" href={`/music?addToPlaylist=${playlist.id}`}>Add track</Link>
+                  <Button disabled={!tracks.length} onClick={() => void playPlaylist(playlist)} size="sm">{t("Play")}</Button>
+                  <Link className="rounded-md bg-white/10 px-3 py-1.5 text-xs font-bold" href={`/music?addToPlaylist=${playlist.id}`}>{t("Add track")}</Link>
                   <div className="flex gap-2">
-                    <Button onClick={() => openEdit(playlist)} size="sm" variant="secondary">Edit</Button>
-                    <Button onClick={() => void removePlaylist(playlist.id)} size="sm" variant="danger">Delete</Button>
+                    <Button onClick={() => openEdit(playlist)} size="sm" variant="secondary">{t("Edit")}</Button>
+                    <Button onClick={() => void removePlaylist(playlist.id)} size="sm" variant="danger">{t("Delete")}</Button>
                   </div>
                 </div>
                 <div className="mt-4 grid max-h-[30rem] gap-2 overflow-y-auto overscroll-contain pr-2">
                   {tracks.length ? tracks.map((track) => (
                     <div className="min-w-0" key={track.id}>
                       <TrackCard artistName={track.artistName} contextQueue={queue} track={track} />
-                      <button className="mt-1 text-xs text-red-300" onClick={() => void removeTrack(playlist.id, track.id)} type="button">Remove</button>
+                      <button className="mt-1 text-xs text-red-300" onClick={() => void removeTrack(playlist.id, track.id)} type="button">{t("Remove")}</button>
                     </div>
-                  )) : <p className="py-6 text-center text-xs text-slate-500">Empty playlist</p>}
+                  )) : <p className="py-6 text-center text-xs text-slate-500">{t("Empty playlist")}</p>}
                 </div>
               </div>
             );
           })}
         </section>
       )}
-      <Modal onClose={() => setIsModalOpen(false)} open={isModalOpen} title={editing ? "Edit playlist" : "Create playlist"}>
+      <Modal onClose={() => setIsModalOpen(false)} open={isModalOpen} title={t(editing ? "Edit playlist" : "Create playlist")}>
         <form className="space-y-4" onSubmit={submit}>
-          <Input autoFocus label="Playlist title" name="playlistTitle" onChange={(e) => setTitleInput(e.target.value)} required value={titleInput} />
-          <Textarea label="Description" onChange={(event) => setDescriptionInput(event.target.value)} rows={3} value={descriptionInput} />
-          <Input accept="image/*" label="Cover image" onChange={(event) => setCoverInput(event.target.files?.[0] ?? null)} type="file" />
-          <Checkbox checked={isPublicInput} label="Public playlist" onChange={(event) => setIsPublicInput(event.target.checked)} />
-          <div className="flex justify-end gap-2"><Button onClick={() => setIsModalOpen(false)} type="button" variant="ghost">Cancel</Button><Button type="submit">Save</Button></div>
+          <Input autoFocus label={t("Playlist title")} name="playlistTitle" onChange={(e) => setTitleInput(e.target.value)} required value={titleInput} />
+          <Textarea label={t("Description")} onChange={(event) => setDescriptionInput(event.target.value)} rows={3} value={descriptionInput} />
+          <Input accept="image/*" label={t("Cover image")} onChange={(event) => setCoverInput(event.target.files?.[0] ?? null)} type="file" />
+          <Checkbox checked={isPublicInput} label={t("Public playlist")} onChange={(event) => setIsPublicInput(event.target.checked)} />
+          <div className="flex justify-end gap-2"><Button onClick={() => setIsModalOpen(false)} type="button" variant="ghost">{t("Cancel")}</Button><Button type="submit">{t("Save")}</Button></div>
         </form>
       </Modal>
     </MainAppLayout>
