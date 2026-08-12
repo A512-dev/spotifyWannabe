@@ -43,7 +43,7 @@ export function NotificationCard({ notification, onDelete, onMarkRead }: Notific
             className="inline-flex h-8 items-center justify-center rounded-md bg-surface-700 px-3 text-sm font-medium text-slate-50 transition hover:bg-surface-600"
             href={notification.actionHref}
           >
-            {t("Open")}
+            {t("Open notification")}
           </Link>
         ) : null}
         {onMarkRead ? (

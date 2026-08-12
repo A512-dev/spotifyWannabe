@@ -1,6 +1,7 @@
 "use client";
 
 import { formatDuration } from "@/lib/formatters";
+import { useUserPreferences } from "@/providers";
 
 interface PlayerControlsProps {
   duration: number;
@@ -31,6 +32,7 @@ export function PlayerControlsPlaceholder({
   onShuffleToggle,
   onRepeatToggle,
 }: PlayerControlsProps) {
+  const { t } = useUserPreferences();
   return (
     <div className="flex max-w-[722px] flex-1 flex-col items-center justify-center gap-2">
       <div className="flex w-full items-center justify-between sm:w-auto sm:justify-center sm:gap-6">
@@ -89,7 +91,7 @@ export function PlayerControlsPlaceholder({
             showExtraControls ? "flex" : "hidden sm:flex"
           } ${repeat !== "off" ? "text-brand-accent drop-shadow" : "text-white/70 hover:text-white"}`}
           onClick={onRepeatToggle}
-          title={repeat === "off" ? "Enable repeat" : repeat === "all" ? "Enable repeat one" : "Disable repeat"}
+          title={t(repeat === "off" ? "Enable repeat" : repeat === "all" ? "Enable repeat one" : "Disable repeat")}
         >
           {repeat === "one" ? (
             <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 16 16">

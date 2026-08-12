@@ -86,11 +86,17 @@ test("renders table empty messages", () => {
 });
 
 test("renders backend subscription distribution as a labeled chart", () => {
-  const html = render(
-    React.createElement(SubscriptionDistributionChart, {
-      distribution: { basic: 6, silver: 3, gold: 1, total: 10 }
-    })
-  );
+  const html = render(React.createElement(
+    AuthProvider,
+    null,
+    React.createElement(
+      UserPreferencesProvider,
+      null,
+      React.createElement(SubscriptionDistributionChart, {
+        distribution: { basic: 6, silver: 3, gold: 1, total: 10 }
+      })
+    )
+  ));
 
   assert.match(html, /Subscription distribution for 10 users/);
   assert.match(html, /Basic/);
