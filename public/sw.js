@@ -1,4 +1,5 @@
-const CACHE_NAME = "spotifywannabe-static-v1";
+const CACHE_NAME = "spotifywannabe-static-v2";
+const CACHE_PREFIX = "spotifywannabe-static-";
 const STATIC_ASSET_PATH = /\/(?:_next\/static\/|.*\.(?:css|js|svg|png|jpg|jpeg|webp|woff2?))$/i;
 
 self.addEventListener("install", (event) => {
@@ -6,7 +7,15 @@ self.addEventListener("install", (event) => {
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches.keys()
+      .then((cacheNames) => Promise.all(
+        cacheNames
+          .filter((cacheName) => cacheName.startsWith(CACHE_PREFIX) && cacheName !== CACHE_NAME)
+          .map((cacheName) => caches.delete(cacheName))
+      ))
+      .then(() => self.clients.claim())
+  );
 });
 
 self.addEventListener("fetch", (event) => {

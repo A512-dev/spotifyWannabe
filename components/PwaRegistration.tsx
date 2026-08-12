@@ -7,7 +7,8 @@ export function PwaRegistration() {
     if (!("serviceWorker" in navigator)) return;
 
     const register = () => {
-      void navigator.serviceWorker.register("/sw.js");
+      void navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" })
+        .then((registration) => registration.update());
     };
 
     if (document.readyState === "complete") {

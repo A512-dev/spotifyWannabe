@@ -10,13 +10,13 @@ import { planApi, type SubscriptionPlanApi } from "@/features/account/plans";
 import { subscriptionApi } from "@/features/account/subscriptions";
 import { formatCurrencyFromCents } from "@/lib/formatters";
 import { getSubscriptionLabel } from "@/lib/labels";
-import { DEFAULT_USER_PREFERENCES, useAuth, useUserPreferences } from "@/providers";
+import { useAuth, useUserPreferences } from "@/providers";
 
 export default function SettingsPage() {
   const router = useRouter();
   const { currentUser, deleteCurrentUser } = useAuth();
-  const { locale, preferences: appliedPreferences, setPreferences: applyPreferences, t } = useUserPreferences();
-  const [preferences, setPreferences] = useState<PreferenceResponse>(DEFAULT_USER_PREFERENCES);
+  const { locale, preferences: appliedPreferences, setLanguage, setPreferences: applyPreferences, t } = useUserPreferences();
+  const [preferences, setPreferences] = useState<PreferenceResponse>(appliedPreferences);
   const [plans, setPlans] = useState<SubscriptionPlanApi[]>([]);
   const [selectedTier, setSelectedTier] = useState<"silver" | "gold">("silver");
   const [months, setMonths] = useState<1 | 3 | 6 | 12>(1);
@@ -27,11 +27,8 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!currentUser) return;
-    void Promise.all([accountApi.getPreferences(), planApi.list()])
-      .then(([prefs, planRows]) => {
-        setPreferences(prefs);
-        setPlans(planRows);
-      })
+    void planApi.list()
+      .then(setPlans)
       .catch((requestError: Error) => setError(requestError.message));
   }, [currentUser]);
 
@@ -74,7 +71,7 @@ export default function SettingsPage() {
     const result = await deleteCurrentUser();
     setDeleteDialogOpen(false);
     if (!result.ok) {
-      setError(result.error ?? t("Could not delete this account."));
+      setError(t(result.error ?? "Could not delete this account."));
       return;
     }
     router.replace("/signup");
@@ -93,7 +90,7 @@ export default function SettingsPage() {
               onChange={(event) => {
                 const language = event.target.value as "en" | "fa";
                 setPreferences((value) => ({ ...value, language }));
-                applyPreferences({ ...appliedPreferences, language });
+                setLanguage(language);
               }}
               options={[{ label: t("English"), value: "en" }, { label: t("Persian"), value: "fa" }]}
               value={preferences.language}

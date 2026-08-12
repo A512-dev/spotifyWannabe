@@ -11,7 +11,7 @@ interface AuthLayoutProps {
 }
 
 export function AuthLayout({ children, description, title }: AuthLayoutProps) {
-  const { preferences, setPreferences, t } = useUserPreferences();
+  const { preferences, setLanguage, t } = useUserPreferences();
   const nextLanguage = preferences.language === "fa" ? "en" : "fa";
 
   return (
@@ -23,7 +23,7 @@ export function AuthLayout({ children, description, title }: AuthLayoutProps) {
             aria-label={t(nextLanguage === "fa" ? "Switch to Persian" : "Switch to English")}
             className="rounded-md border border-surface-600 px-3 py-1.5 text-sm text-slate-300 hover:bg-surface-700 hover:text-white"
             lang={nextLanguage}
-            onClick={() => setPreferences({ ...preferences, language: nextLanguage })}
+            onClick={() => setLanguage(nextLanguage)}
             type="button"
           >
             {nextLanguage === "fa" ? "فارسی" : "English"}

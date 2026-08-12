@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { accountApi, type PreferenceResponse } from "@/features/account/api";
 import { getStoredLanguage, LANGUAGE_STORAGE_KEY, localeForLanguage, translate } from "@/lib/i18n";
@@ -18,6 +18,7 @@ export const DEFAULT_USER_PREFERENCES: PreferenceResponse = {
 interface UserPreferencesContextValue {
   preferences: PreferenceResponse;
   setPreferences: (value: PreferenceResponse) => void;
+  setLanguage: (language: PreferenceResponse["language"]) => void;
   refreshPreferences: () => Promise<void>;
   locale: string;
   t: (label: string, values?: Record<string, string | number>) => string;
@@ -27,22 +28,42 @@ const UserPreferencesContext = createContext<UserPreferencesContextValue | undef
 
 export function UserPreferencesProvider({ children }: { children: ReactNode }) {
   const { currentUser } = useAuth();
-  const [preferences, setPreferences] = useState<PreferenceResponse>(() => ({
+  const [preferences, setPreferencesState] = useState<PreferenceResponse>(() => ({
     ...DEFAULT_USER_PREFERENCES,
     language: getStoredLanguage()
   }));
+  const preferenceRevision = useRef(0);
+
+  const setPreferences = useCallback((value: PreferenceResponse) => {
+    preferenceRevision.current += 1;
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, value.language);
+    setPreferencesState(value);
+  }, []);
 
   const refreshPreferences = useCallback(async () => {
     if (!currentUser) {
-      setPreferences({ ...DEFAULT_USER_PREFERENCES, language: getStoredLanguage() });
+      setPreferencesState((current) => ({ ...DEFAULT_USER_PREFERENCES, language: current.language }));
       return;
     }
-    setPreferences(await accountApi.getPreferences());
+    const requestRevision = preferenceRevision.current;
+    const remotePreferences = await accountApi.getPreferences();
+    if (requestRevision === preferenceRevision.current) {
+      setPreferencesState(remotePreferences);
+    }
   }, [currentUser]);
 
   useEffect(() => {
-    void refreshPreferences().catch(() => setPreferences(DEFAULT_USER_PREFERENCES));
+    void refreshPreferences().catch(() => undefined);
   }, [refreshPreferences]);
+
+  const setLanguage = useCallback((language: PreferenceResponse["language"]) => {
+    preferenceRevision.current += 1;
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, language);
+    setPreferencesState((current) => ({ ...current, language }));
+    if (currentUser) {
+      void accountApi.updatePreferences({ language }).catch(() => undefined);
+    }
+  }, [currentUser]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -79,7 +100,7 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
     (label: string, values?: Record<string, string | number>) => translate(preferences.language, label, values),
     [preferences.language]
   );
-  const value = useMemo(() => ({ preferences, setPreferences, refreshPreferences, locale, t }), [preferences, refreshPreferences, locale, t]);
+  const value = useMemo(() => ({ preferences, setPreferences, setLanguage, refreshPreferences, locale, t }), [preferences, setPreferences, setLanguage, refreshPreferences, locale, t]);
   return <UserPreferencesContext.Provider value={value}>{children}</UserPreferencesContext.Provider>;
 }
 
