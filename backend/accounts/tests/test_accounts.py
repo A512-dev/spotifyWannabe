@@ -43,6 +43,22 @@ class AccountsApiTests(APITestCase):
         response = self.client.post(reverse("accounts:register-listener"), self.listener_payload(), format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_password_validation_only_rejects_short_or_numeric_passwords(self):
+        accepted = self.listener_payload(email="simple@example.com")
+        accepted["password"] = accepted["passwordConfirmation"] = "simple"
+        self.assertEqual(
+            self.client.post(reverse("accounts:register-listener"), accepted, format="json").status_code,
+            status.HTTP_201_CREATED,
+        )
+
+        for email, password in [("short@example.com", "short"), ("numeric@example.com", "123456")]:
+            rejected = self.listener_payload(email=email)
+            rejected["password"] = rejected["passwordConfirmation"] = password
+            self.assertEqual(
+                self.client.post(reverse("accounts:register-listener"), rejected, format="json").status_code,
+                status.HTTP_400_BAD_REQUEST,
+            )
+
     def test_privacy_policy_is_required(self):
         payload = self.listener_payload()
         payload["acceptsPrivacyPolicy"] = False
