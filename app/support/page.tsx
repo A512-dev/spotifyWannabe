@@ -183,7 +183,12 @@ function SupportContent() {
     },
     { key: "created", header: t("Submitted"), render: (row) => formatDate(row.createdAt, locale) },
     { key: "status", header: t("Status"), render: (row) => <Badge tone={statusTone[row.status]}>{t(row.status.replaceAll("_", " "))}</Badge> },
-    { key: "priority", header: t("Priority"), render: (row) => <Badge>{t(row.priority)}</Badge> }
+    { key: "priority", header: t("Priority"), render: (row) => <Badge>{t(row.priority)}</Badge> },
+    {
+      key: "actions",
+      header: t("Actions"),
+      render: (row) => <Button onClick={() => void openTicket(row)} size="sm" variant="secondary">{t("Open")}</Button>
+    }
   ], [locale, openTicket, t]);
 
   const applicationColumns = useMemo<TableColumn<ArtistApplicationApi>[]>(() => [
