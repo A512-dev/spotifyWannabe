@@ -30,6 +30,8 @@ export const PERSIAN_LABELS: Record<string, string> = {
   "Danger zone": "ناحیهٔ خطر",
   "Delete account": "حذف حساب",
   "Main navigation": "ناوبری اصلی",
+  "Open navigation": "باز کردن منوی ناوبری",
+  "Close navigation": "بستن منوی ناوبری",
   Workspace: "فضای کاری",
   Account: "حساب کاربری",
   "Session Active": "نشست فعال",

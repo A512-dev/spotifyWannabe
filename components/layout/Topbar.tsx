@@ -25,7 +25,7 @@ export function Topbar() {
   const isGold = currentUser.subscriptionTier === "gold";
 
   return (
-    <header className="sticky top-0 z-20 border-b border-white/[0.06] bg-[#1a0b2e]/60 px-6 py-3.5 backdrop-blur-xl shadow-[0_4px_30px_rgba(0,0,0,0.2)]">
+    <header className="sticky top-0 z-20 border-b border-white/[0.06] bg-[#1a0b2e]/60 pe-4 ps-20 py-3.5 shadow-[0_4px_30px_rgba(0,0,0,0.2)] backdrop-blur-xl md:px-6">
       <div className="flex items-center justify-between gap-4">
         
         {/* بخش چپ: اطلاعات اکانت با چراغ سیگنال آنلاین */}

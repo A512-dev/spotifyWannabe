@@ -44,7 +44,7 @@ export function Sidebar() {
         aria-controls="mobile-navigation"
         aria-expanded={isMobileMenuOpen}
         aria-label={t(isMobileMenuOpen ? "Close navigation" : "Open navigation")}
-        className="fixed left-4 top-4 z-50 grid h-11 w-11 place-items-center rounded-xl border border-white/10 bg-[#1a0b2e]/95 text-white shadow-lg backdrop-blur-xl md:hidden"
+        className="fixed start-4 top-4 z-50 grid h-11 w-11 place-items-center rounded-xl border border-white/10 bg-[#1a0b2e]/95 text-white shadow-lg backdrop-blur-xl md:hidden"
         onClick={() => setIsMobileMenuOpen((open) => !open)}
         type="button"
       >
