@@ -31,6 +31,7 @@ export function PlayerShell() {
   const [progress, setProgress] = useState(0);
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState<"off" | "all" | "one">("off");
+  const touchStartYRef = useRef<number | null>(null);
   const volume = playerState.volume ?? 100;
 
   const persistQueue = useCallback((queue: Track[]) => {
@@ -237,6 +238,11 @@ export function PlayerShell() {
     setProgress(time);
   };
   const toggleRepeat = () => setRepeat((value) => value === "off" ? "all" : value === "all" ? "one" : "off");
+  const dismissPlayer = () => {
+    audioRef.current?.pause();
+    setIsMobileExpanded(false);
+    setPlayerState((state) => ({ ...state, currentTrackId: undefined, isPlaying: false }));
+  };
 
   return (
     <>
@@ -260,7 +266,14 @@ export function PlayerShell() {
         src={streamUrl ?? undefined}
       />
 
-      <footer className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/5 bg-[#1a0b2e]/95 px-4 py-3 text-white shadow-[0_-4px_24px_rgba(0,0,0,0.4)] backdrop-blur-xl">
+      <footer
+        className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/5 bg-[#1a0b2e]/95 px-4 py-3 text-white shadow-[0_-4px_24px_rgba(0,0,0,0.4)] backdrop-blur-xl"
+        onTouchEnd={(event) => {
+          if (touchStartYRef.current !== null && event.changedTouches[0].clientY - touchStartYRef.current > 70) dismissPlayer();
+          touchStartYRef.current = null;
+        }}
+        onTouchStart={(event) => { touchStartYRef.current = event.touches[0].clientY; }}
+      >
         {playerError ? <p className="mx-auto mb-2 max-w-7xl rounded-md bg-rose-500/15 px-3 py-1.5 text-xs text-rose-200">{playerError}</p> : null}
         <div className="relative mx-auto flex w-full max-w-7xl items-center justify-between gap-4">
           <button className="flex min-w-0 flex-1 text-start sm:w-[30%] sm:flex-none" onClick={() => setIsMobileExpanded(true)} type="button">
@@ -275,6 +288,7 @@ export function PlayerShell() {
             {currentTrack.lyrics ? <button className="hidden text-xs text-white/70 sm:block" onClick={() => { setIsLyricsOpen((value) => !value); setIsQueueOpen(false); }} type="button">{t("Lyrics")}</button> : null}
             <button className="hidden text-xs text-white/70 sm:block" onClick={() => { setIsQueueOpen((value) => !value); setIsLyricsOpen(false); }} type="button">{t("Queue")}</button>
             <input aria-label={t("Volume")} className="hidden w-24 accent-brand-secondary sm:block" max="100" min="0" onChange={(event) => setPlayerState((state) => ({ ...state, volume: Number(event.target.value) }))} type="range" value={volume} />
+            <button aria-label={t("Close player")} className="grid h-8 w-8 place-items-center rounded-full text-lg text-white/70 hover:bg-white/10 hover:text-white" onClick={dismissPlayer} type="button">×</button>
             {isLyricsOpen && currentTrack.lyrics ? <div className="absolute bottom-[calc(100%+1rem)] right-0 max-h-80 w-80 overflow-y-auto rounded-xl border border-white/10 bg-[#160926]/95 p-4 text-sm whitespace-pre-line shadow-2xl">{currentTrack.lyrics}</div> : null}
             {isQueueOpen ? <div className="absolute bottom-[calc(100%+1rem)] right-0 w-96 max-w-[90vw] rounded-xl border border-white/10 bg-[#160926]/95 p-4 shadow-2xl"><h3 className="mb-3 text-xs font-bold uppercase text-white/50">{t("Playback queue")}</h3>{queuePanel}</div> : null}
           </div>
@@ -284,7 +298,7 @@ export function PlayerShell() {
       {isMobileExpanded ? (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-[#160926]/98 p-6 text-white backdrop-blur-3xl sm:hidden">
           <div className="mx-auto flex min-h-full max-w-sm flex-col gap-6">
-            <div className="flex items-center justify-between"><button onClick={() => setIsMobileExpanded(false)} type="button">{t("Close")}</button><span className="text-xs uppercase text-white/50">{t("Now playing")}</span><span /></div>
+            <div className="flex items-center justify-between"><button onClick={() => setIsMobileExpanded(false)} type="button">{t("Close")}</button><span className="text-xs uppercase text-white/50">{t("Now playing")}</span><button aria-label={t("Close player")} className="text-xl text-white/70" onClick={dismissPlayer} type="button">×</button></div>
             <div className="aspect-square overflow-hidden rounded-3xl bg-white/5">{currentTrack.coverImageUrl ? <img alt={currentTrack.title} className="h-full w-full object-cover" src={currentTrack.coverImageUrl} /> : null}</div>
             <div className="text-center">
               <h2 className="text-2xl font-black">{currentTrack.title}</h2>

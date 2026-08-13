@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { formatNumber } from "@/lib/formatters";
 import { useAuth, useUserPreferences } from "@/providers";
 import type { Track } from "@/types/domain";
@@ -12,6 +13,26 @@ interface PlayerTrackSummaryProps {
 export function PlayerTrackSummary({ track }: PlayerTrackSummaryProps) {
   const { currentUser } = useAuth();
   const { locale, t } = useUserPreferences();
+  const titleContainerRef = useRef<HTMLDivElement | null>(null);
+  const titleRef = useRef<HTMLSpanElement | null>(null);
+  const [titleOverflow, setTitleOverflow] = useState(false);
+  const [marqueeDistance, setMarqueeDistance] = useState(0);
+
+  useEffect(() => {
+    const updateTitleOverflow = () => {
+      const container = titleContainerRef.current;
+      const title = titleRef.current;
+      if (!container || !title) return;
+      const distance = Math.max(0, title.scrollWidth - container.clientWidth);
+      setTitleOverflow(distance > 0);
+      setMarqueeDistance(distance);
+    };
+
+    updateTitleOverflow();
+    const observer = new ResizeObserver(updateTitleOverflow);
+    if (titleContainerRef.current) observer.observe(titleContainerRef.current);
+    return () => observer.disconnect();
+  }, [track?.title]);
   if (!track) return null;
 
   return (
@@ -20,7 +41,15 @@ export function PlayerTrackSummary({ track }: PlayerTrackSummaryProps) {
         {track.coverImageUrl ? <img alt={track.title} className="h-full w-full object-cover" src={track.coverImageUrl} /> : <div className="flex h-full items-center justify-center text-[10px] text-white/50">{t("Cover")}</div>}
       </div>
       <div className="flex min-w-0 flex-col justify-center">
-        <span className="truncate text-sm font-bold text-white">{track.title}</span>
+        <div aria-label={track.title} className="overflow-hidden text-sm font-bold text-white" ref={titleContainerRef}>
+          <span
+            className={titleOverflow ? "inline-block whitespace-nowrap will-change-transform [animation:player-title-marquee_7s_ease-in-out_infinite_alternate]" : "block truncate"}
+            ref={titleRef}
+            style={titleOverflow ? { "--player-title-marquee-distance": `-${marqueeDistance}px` } as CSSProperties : undefined}
+          >
+            {track.title}
+          </span>
+        </div>
         <div className="flex items-center gap-1 truncate text-xs font-medium text-white/80">
           <Link className="hover:text-white hover:underline" href={`/artist/${track.artistId}`} onClick={(event) => event.stopPropagation()}>
             {track.artistName ?? t("Unknown artist")}

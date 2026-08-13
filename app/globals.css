@@ -77,3 +77,14 @@ textarea,
 select {
   font: inherit;
 }
+
+@keyframes player-title-marquee {
+  0%, 18% { transform: translateX(0); }
+  82%, 100% { transform: translateX(var(--player-title-marquee-distance)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [class*="player-title-marquee"] {
+    animation: none !important;
+  }
+}
