@@ -260,7 +260,7 @@ export function PlayerShell() {
         src={streamUrl ?? undefined}
       />
 
-      <footer className="fixed bottom-[70px] left-0 right-0 z-40 border-t border-white/5 bg-[#1a0b2e]/95 px-4 py-3 text-white shadow-[0_-4px_24px_rgba(0,0,0,0.4)] backdrop-blur-xl md:bottom-0">
+      <footer className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/5 bg-[#1a0b2e]/95 px-4 py-3 text-white shadow-[0_-4px_24px_rgba(0,0,0,0.4)] backdrop-blur-xl">
         {playerError ? <p className="mx-auto mb-2 max-w-7xl rounded-md bg-rose-500/15 px-3 py-1.5 text-xs text-rose-200">{playerError}</p> : null}
         <div className="relative mx-auto flex w-full max-w-7xl items-center justify-between gap-4">
           <button className="flex min-w-0 flex-1 text-start sm:w-[30%] sm:flex-none" onClick={() => setIsMobileExpanded(true)} type="button">
