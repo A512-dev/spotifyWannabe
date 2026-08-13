@@ -34,7 +34,7 @@ export function PlayerControlsPlaceholder({
 }: PlayerControlsProps) {
   const { t } = useUserPreferences();
   return (
-    <div className="flex max-w-[722px] flex-1 flex-col items-center justify-center gap-2">
+    <div className="flex max-w-[722px] flex-1 flex-col items-center justify-center gap-2" dir="ltr">
       <div className="flex w-full items-center justify-between sm:w-auto sm:justify-center sm:gap-6">
         {/* Shuffle */}
         <button
