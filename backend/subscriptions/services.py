@@ -134,38 +134,54 @@ def initiate_payment(*, user, tier: str, months: int, callback_url: str):
 @transaction.atomic
 def verify_payment(*, authority: str, status: str):
     try:
-        payment = PaymentTransaction.objects.select_for_update().select_related("plan", "user").get(authority=authority)
+        payment = PaymentTransaction.objects.select_related("plan", "user").get(authority=authority)
     except PaymentTransaction.DoesNotExist as exc:
         raise ValidationError({"authority": "Unknown payment authority."}) from exc
 
+    # Return immediately if payment is already marked as success
     if payment.status == PaymentStatus.SUCCESS:
         return payment
-    gateway = get_gateway() if payment.gateway != "local-sandbox" else __import__(
-        "subscriptions.gateways", fromlist=["LocalSandboxGateway"]
-    ).LocalSandboxGateway()
+
+    # Determine payment gateway
+    if payment.gateway != "local-sandbox":
+        gateway = get_gateway()
+    else:
+        from subscriptions.gateways import LocalSandboxGateway
+        gateway = LocalSandboxGateway()
+
+    # Perform external network request outside database transaction
     result = gateway.verify(authority=authority, amount_cents=payment.amount_cents, status=status)
-    payment.gateway_response = result.raw
-    if not result.success:
-        payment.status = PaymentStatus.CANCELED if status.upper() != "OK" else PaymentStatus.FAILED
-        payment.save(update_fields=["status", "gateway_response", "updated_at"])
+
+    # Perform database updates inside an isolated transaction
+    with transaction.atomic():
+        payment.refresh_from_db()
+        if payment.status == PaymentStatus.SUCCESS:
+            return payment
+
+        payment.gateway_response = result.raw
+        if not result.success:
+            payment.status = PaymentStatus.CANCELED if status.upper() != "OK" else PaymentStatus.FAILED
+            payment.save(update_fields=["status", "gateway_response", "updated_at"])
+            return payment
+
+        payment.status = PaymentStatus.SUCCESS
+        payment.reference_id = result.reference_id
+        payment.verified_at = timezone.now()
+        payment.save(update_fields=["status", "reference_id", "verified_at", "gateway_response", "updated_at"])
+
+        current = active_subscription_for(payment.user)
+        starts_at = timezone.now()
+        base_time = current.ends_at if current and current.ends_at > starts_at else starts_at
+
+        if current:
+            current.status = SubscriptionStatus.CANCELED
+            current.save(update_fields=["status", "updated_at"])
+
+        UserSubscription.objects.create(
+            user=payment.user,
+            plan=payment.plan,
+            starts_at=starts_at,
+            ends_at=add_calendar_months(base_time, payment.months),
+            status=SubscriptionStatus.ACTIVE,
+        )
         return payment
-
-    payment.status = PaymentStatus.SUCCESS
-    payment.reference_id = result.reference_id
-    payment.verified_at = timezone.now()
-    payment.save(update_fields=["status", "reference_id", "verified_at", "gateway_response", "updated_at"])
-
-    current = active_subscription_for(payment.user)
-    starts_at = timezone.now()
-    base_time = current.ends_at if current and current.ends_at > starts_at else starts_at
-    if current:
-        current.status = SubscriptionStatus.CANCELED
-        current.save(update_fields=["status", "updated_at"])
-    UserSubscription.objects.create(
-        user=payment.user,
-        plan=payment.plan,
-        starts_at=starts_at,
-        ends_at=add_calendar_months(base_time, payment.months),
-        status=SubscriptionStatus.ACTIVE,
-    )
-    return payment

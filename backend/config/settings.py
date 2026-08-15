@@ -79,6 +79,8 @@ WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
 postgres_db = os.getenv("POSTGRES_DB", "").strip()
+postgres_db = os.getenv("POSTGRES_DB", "").strip()
+
 if postgres_db:
     DATABASES = {
         "default": {
@@ -96,6 +98,10 @@ else:
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
             "NAME": BASE_DIR / "db.sqlite3",
+            "OPTIONS": {
+                "timeout": 30,
+                "init_command": "PRAGMA journal_mode=WAL;",
+            },
         }
     }
 
