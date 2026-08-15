@@ -1,6 +1,8 @@
 from django.contrib import admin
+from django.utils import timezone
 
-from artists.models import ArtistApplication, ArtistProfile, ArtistSampleWork
+from artists.models import ArtistApplication, ArtistApplicationStatus, ArtistProfile, ArtistSampleWork
+from artists.services import review_artist_application
 
 
 class ArtistSampleWorkInline(admin.TabularInline):
@@ -23,6 +25,38 @@ class ArtistApplicationAdmin(admin.ModelAdmin):
     search_fields = ["stage_name", "applicant__username", "applicant__email"]
     readonly_fields = ["created_at", "updated_at", "reviewed_at"]
     inlines = [ArtistSampleWorkInline]
+    actions = ["approve_applications", "reject_applications"]
+
+    @admin.action(description="تایید درخواست‌های انتخاب‌شده (Approve)")
+    def approve_applications(self, request, queryset):
+        for app in queryset.filter(status=ArtistApplicationStatus.PENDING):
+            review_artist_application(
+                application=app,
+                reviewer=request.user,
+                decision=ArtistApplicationStatus.APPROVED,
+                review_note="Approved via Django Admin",
+            )
+
+    @admin.action(description="رد درخواست‌های انتخاب‌شده (Reject)")
+    def reject_applications(self, request, queryset):
+        for app in queryset.filter(status=ArtistApplicationStatus.PENDING):
+            review_artist_application(
+                application=app,
+                reviewer=request.user,
+                decision=ArtistApplicationStatus.REJECTED,
+                review_note="Rejected via Django Admin",
+            )
+
+    def save_model(self, request, obj, form, change):
+        if change and "status" in form.changed_data:
+            review_artist_application(
+                application=obj,
+                reviewer=request.user,
+                decision=obj.status,
+                review_note=obj.review_note or "Reviewed via Admin form",
+            )
+        else:
+            super().save_model(request, obj, form, change)
 
 
 @admin.register(ArtistProfile)
