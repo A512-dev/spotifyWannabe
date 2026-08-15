@@ -24,6 +24,11 @@ export default function SettingsPage() {
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -38,7 +43,13 @@ export default function SettingsPage() {
 
   const selectedPlan = useMemo(() => plans.find((plan) => plan.tier === selectedTier), [plans, selectedTier]);
 
-  if (!currentUser) return <MainAppLayout>{t("Loading settings...")}</MainAppLayout>;
+  if (!mounted || !currentUser) {
+    return (
+      <MainAppLayout>
+        <span suppressHydrationWarning>Loading...</span>
+      </MainAppLayout>
+    );
+  }
 
   const handleSave = async () => {
     setSaving(true);
